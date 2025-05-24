@@ -1,4 +1,5 @@
 import pytest
+import sqlite3
 from uplt.charts import create_heatmap, format_chart_output, is_numeric_axis, create_numeric_scale, find_bin_index
 
 
@@ -276,3 +277,74 @@ class TestFormatChartOutput:
         
         # Should pass kwargs to create_heatmap
         assert ".=10 to @=90" in result
+
+
+class TestHeatmapAggregation:
+    """Test the new SQL-based aggregation for heatmaps."""
+    
+    def setup_method(self):
+        self.conn = sqlite3.connect(':memory:')
+        self.cursor = self.conn.cursor()
+        
+        # Create a test table with duplicate x,y pairs
+        self.cursor.execute("""
+            CREATE TABLE test_data (x INTEGER, y INTEGER, value INTEGER)
+        """)
+        
+        # Insert test data with multiple values per cell
+        test_data = [
+            (1, 1, 10), (1, 1, 20), (1, 1, 30),  # avg=20, sum=60, min=10, max=30
+            (2, 2, 100), (2, 2, 200), (2, 2, 300),  # avg=200, sum=600, min=100, max=300
+        ]
+        self.cursor.executemany("INSERT INTO test_data VALUES (?, ?, ?)", test_data)
+    
+    def teardown_method(self):
+        self.conn.close()
+    
+    def test_sum_aggregation(self):
+        from uplt.charts import create_heatmap_with_proper_aggregation
+        
+        result = create_heatmap_with_proper_aggregation(
+            self.cursor, "x", "y", "sum(value)", "test_data"
+        )
+        
+        assert result is not None
+        # The sum values should be 60 and 600
+        assert "60" in result
+        assert "600" in result
+    
+    def test_avg_aggregation(self):
+        from uplt.charts import create_heatmap_with_proper_aggregation
+        
+        result = create_heatmap_with_proper_aggregation(
+            self.cursor, "x", "y", "avg(value)", "test_data"
+        )
+        
+        assert result is not None
+        # The avg values should be 20 and 200
+        assert "20" in result
+        assert "200" in result
+    
+    def test_min_aggregation(self):
+        from uplt.charts import create_heatmap_with_proper_aggregation
+        
+        result = create_heatmap_with_proper_aggregation(
+            self.cursor, "x", "y", "min(value)", "test_data"
+        )
+        
+        assert result is not None
+        # The min values should be 10 and 100
+        assert "10" in result
+        assert "100" in result
+    
+    def test_max_aggregation(self):
+        from uplt.charts import create_heatmap_with_proper_aggregation
+        
+        result = create_heatmap_with_proper_aggregation(
+            self.cursor, "x", "y", "max(value)", "test_data"
+        )
+        
+        assert result is not None
+        # The max values should be 30 and 300
+        assert "30" in result
+        assert "300" in result

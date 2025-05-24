@@ -1,5 +1,7 @@
 """Terminal chart plotting using Unicode characters."""
 import math
+import sqlite3
+import sys
 from typing import List, Tuple, Optional, Union, Dict
 
 
@@ -281,3 +283,370 @@ def format_chart_output(chart_type: str, data: List[Tuple], **kwargs) -> str:
         return create_heatmap(data, **kwargs)
     else:
         raise ValueError(f"Unknown chart type: {chart_type}")
+
+
+def create_heatmap_with_proper_aggregation(
+    cursor: sqlite3.Cursor,
+    x_field: str,
+    y_field: str, 
+    value_field: Optional[str],
+    table_name: str,
+    width: Optional[int] = None,
+    height: Optional[int] = None,
+    verbose: bool = False
+) -> Optional[str]:
+    """
+    Create a heatmap with proper SQL-based aggregation for binned data.
+    
+    This avoids double aggregation by determining bins first, then running
+    a SQL query that groups by those bins with the correct aggregation function.
+    """
+    from .query_builder import parse_aggregation
+    from .core import execute_query
+    
+    # First, get the range of values to determine if axes are numeric
+    range_query = f"""
+    SELECT 
+        MIN({x_field}) as x_min, MAX({x_field}) as x_max,
+        MIN({y_field}) as y_min, MAX({y_field}) as y_max
+    FROM {table_name}
+    """
+    
+    try:
+        range_results = execute_query(cursor, range_query)
+        if not range_results or not range_results[0]:
+            return None
+        
+        x_min, x_max, y_min, y_max = range_results[0]
+        
+        # Check if axes are numeric by trying to convert min/max values
+        x_is_numeric = False
+        y_is_numeric = False
+        
+        try:
+            x_min_num = float(x_min) if x_min is not None else None
+            x_max_num = float(x_max) if x_max is not None else None
+            if x_min_num is not None and x_max_num is not None:
+                x_is_numeric = True
+        except (ValueError, TypeError):
+            pass
+            
+        try:
+            y_min_num = float(y_min) if y_min is not None else None
+            y_max_num = float(y_max) if y_max is not None else None
+            if y_min_num is not None and y_max_num is not None:
+                y_is_numeric = True
+        except (ValueError, TypeError):
+            pass
+        
+        # Parse the aggregation function if provided
+        if value_field:
+            agg_func, field_name = parse_aggregation(value_field)
+            if agg_func:
+                value_expr = f"{agg_func.upper()}({field_name})"
+            else:
+                value_expr = value_field
+        else:
+            value_expr = "COUNT(*)"
+            agg_func = "count"
+        
+        # Build the query based on whether axes are numeric
+        if x_is_numeric and y_is_numeric:
+            # Both axes numeric - need binning
+            x_scale = create_numeric_scale(x_min_num, x_max_num, width or 20)
+            y_scale = create_numeric_scale(y_min_num, y_max_num, height or 15)
+            
+            # Build CASE statements for binning
+            x_case_parts = []
+            for i in range(len(x_scale) - 1):
+                x_case_parts.append(
+                    f"WHEN {x_field} >= {x_scale[i]} AND {x_field} < {x_scale[i+1]} THEN {i}"
+                )
+            # Handle the last bin edge case
+            x_case_parts.append(f"WHEN {x_field} = {x_scale[-1]} THEN {len(x_scale)-2}")
+            x_case = f"CASE {' '.join(x_case_parts)} END"
+            
+            y_case_parts = []
+            for i in range(len(y_scale) - 1):
+                y_case_parts.append(
+                    f"WHEN {y_field} >= {y_scale[i]} AND {y_field} < {y_scale[i+1]} THEN {i}"
+                )
+            y_case_parts.append(f"WHEN {y_field} = {y_scale[-1]} THEN {len(y_scale)-2}")
+            y_case = f"CASE {' '.join(y_case_parts)} END"
+            
+            query = f"""
+            SELECT 
+                {x_case} as x_bin,
+                {y_case} as y_bin,
+                {value_expr} as value
+            FROM {table_name}
+            WHERE ({x_field} IS NOT NULL) AND ({y_field} IS NOT NULL)
+            GROUP BY x_bin, y_bin
+            HAVING x_bin IS NOT NULL AND y_bin IS NOT NULL
+            """
+            
+        elif x_is_numeric and not y_is_numeric:
+            # X numeric, Y categorical
+            x_scale = create_numeric_scale(x_min_num, x_max_num, width or 20)
+            
+            x_case_parts = []
+            for i in range(len(x_scale) - 1):
+                x_case_parts.append(
+                    f"WHEN {x_field} >= {x_scale[i]} AND {x_field} < {x_scale[i+1]} THEN {i}"
+                )
+            x_case_parts.append(f"WHEN {x_field} = {x_scale[-1]} THEN {len(x_scale)-2}")
+            x_case = f"CASE {' '.join(x_case_parts)} END"
+            
+            query = f"""
+            SELECT 
+                {x_case} as x_bin,
+                {y_field} as y,
+                {value_expr} as value
+            FROM {table_name}
+            WHERE ({x_field} IS NOT NULL) AND ({y_field} IS NOT NULL)
+            GROUP BY x_bin, {y_field}
+            HAVING x_bin IS NOT NULL
+            """
+            
+        elif not x_is_numeric and y_is_numeric:
+            # X categorical, Y numeric
+            y_scale = create_numeric_scale(y_min_num, y_max_num, height or 15)
+            
+            y_case_parts = []
+            for i in range(len(y_scale) - 1):
+                y_case_parts.append(
+                    f"WHEN {y_field} >= {y_scale[i]} AND {y_field} < {y_scale[i+1]} THEN {i}"
+                )
+            y_case_parts.append(f"WHEN {y_field} = {y_scale[-1]} THEN {len(y_scale)-2}")
+            y_case = f"CASE {' '.join(y_case_parts)} END"
+            
+            query = f"""
+            SELECT 
+                {x_field} as x,
+                {y_case} as y_bin,
+                {value_expr} as value
+            FROM {table_name}
+            WHERE ({x_field} IS NOT NULL) AND ({y_field} IS NOT NULL)
+            GROUP BY {x_field}, y_bin
+            HAVING y_bin IS NOT NULL
+            """
+            
+        else:
+            # Both categorical - simple grouping
+            query = f"""
+            SELECT 
+                {x_field} as x,
+                {y_field} as y,
+                {value_expr} as value
+            FROM {table_name}
+            WHERE ({x_field} IS NOT NULL) AND ({y_field} IS NOT NULL)
+            GROUP BY {x_field}, {y_field}
+            """
+        
+        if verbose:
+            print(f"Generated query: {query}", file=sys.stderr)
+        
+        results = execute_query(cursor, query)
+        
+        if not results:
+            return None
+        
+        # Now we need to transform the results for the heatmap
+        # For binned axes, we need to reconstruct the actual values
+        transformed_data = []
+        
+        for row in results:
+            if x_is_numeric and y_is_numeric:
+                x_bin, y_bin, value = row
+                if x_bin is not None and y_bin is not None:
+                    # Use the bin index as a proxy for the value
+                    x_val = x_scale[x_bin]
+                    y_val = y_scale[y_bin]
+                    transformed_data.append((x_val, y_val, value))
+            elif x_is_numeric:
+                x_bin, y_val, value = row
+                if x_bin is not None:
+                    x_val = x_scale[x_bin]
+                    transformed_data.append((x_val, y_val, value))
+            elif y_is_numeric:
+                x_val, y_bin, value = row
+                if y_bin is not None:
+                    y_val = y_scale[y_bin]
+                    transformed_data.append((x_val, y_val, value))
+            else:
+                transformed_data.append(row)
+        
+        # Now create the heatmap without any additional aggregation
+        return create_heatmap_without_aggregation(
+            transformed_data,
+            x_scale if x_is_numeric else None,
+            y_scale if y_is_numeric else None,
+            width=width,
+            height=height
+        )
+        
+    except Exception as e:
+        if verbose:
+            print(f"Error creating heatmap: {e}", file=sys.stderr)
+        return None
+
+
+def create_heatmap_without_aggregation(
+    data: List[Tuple],
+    x_scale: Optional[List[float]] = None,
+    y_scale: Optional[List[float]] = None,
+    width: Optional[int] = None,
+    height: Optional[int] = None,
+    chars: str = " ░▒▓█"
+) -> str:
+    """
+    Create a heatmap from pre-aggregated data without any additional aggregation.
+    
+    This is used when SQL has already done the aggregation for us.
+    """
+    if not data:
+        return "No data to plot"
+    
+    # Extract values and determine axes
+    x_values_raw = [row[0] for row in data]
+    y_values_raw = [row[1] for row in data]
+    
+    # Use provided scales or create from data
+    if x_scale is not None:
+        x_is_numeric = True
+        x_labels = [f"{x:.6g}" for x in x_scale]
+        x_bins = len(x_scale) - 1
+    else:
+        x_is_numeric = False
+        x_labels = sorted(list(set(str(x) for x in x_values_raw)))
+        x_bins = len(x_labels)
+    
+    if y_scale is not None:
+        y_is_numeric = True
+        y_labels = [f"{y:.6g}" for y in y_scale]
+        y_bins = len(y_scale) - 1
+        # Reverse for display
+        y_labels = list(reversed(y_labels))
+        y_scale = list(reversed(y_scale))
+    else:
+        y_is_numeric = False
+        y_labels = sorted(list(set(str(y) for y in y_values_raw)), reverse=True)
+        y_bins = len(y_labels)
+    
+    # Create grid - no aggregation needed as SQL already did it
+    grid = {}
+    all_values = []
+    
+    for x_raw, y_raw, value in data:
+        if value is None:
+            continue
+            
+        try:
+            numeric_value = float(value)
+        except (ValueError, TypeError):
+            continue
+        
+        # Find grid position
+        if x_is_numeric:
+            x_idx = find_bin_index(float(x_raw), x_scale)
+            if x_idx < 0:
+                continue
+        else:
+            try:
+                x_idx = x_labels.index(str(x_raw))
+            except ValueError:
+                continue
+        
+        if y_is_numeric:
+            # y_scale is already reversed
+            original_scale = list(reversed(y_scale))
+            bin_idx = find_bin_index(float(y_raw), original_scale)
+            if bin_idx < 0:
+                continue
+            y_idx = y_bins - 1 - bin_idx
+            if y_idx < 0 or y_idx >= y_bins:
+                continue
+        else:
+            try:
+                y_idx = y_labels.index(str(y_raw))
+            except ValueError:
+                continue
+        
+        # Direct assignment - no aggregation
+        grid[(x_idx, y_idx)] = numeric_value
+        all_values.append(numeric_value)
+    
+    if not all_values:
+        return "No numeric values to plot"
+    
+    # Find min and max for color scaling
+    min_val = min(all_values)
+    max_val = max(all_values)
+    
+    # Build the rest of the heatmap as before
+    if min_val == max_val:
+        char_idx = len(chars) // 2
+    else:
+        char_idx = None
+    
+    # Calculate label widths
+    x_label_width = max(len(label) for label in x_labels) if x_labels else 0
+    y_label_width = max(len(label) for label in y_labels) if y_labels else 0
+    
+    # Build the heatmap
+    lines = []
+    
+    # Add header with x labels
+    if x_is_numeric:
+        header = " " * (y_label_width + 1)
+        for i, label in enumerate(x_labels[:-1]):
+            header += label.rjust(x_label_width + 1)
+        lines.append(header)
+    else:
+        header = " " * (y_label_width + 1)
+        for label in x_labels:
+            header += label.rjust(x_label_width + 1)
+        lines.append(header)
+    
+    # Add separator
+    separator = " " * (y_label_width + 1) + "-" * (x_bins * (x_label_width + 1))
+    lines.append(separator)
+    
+    # Add data rows
+    for y_idx in range(y_bins):
+        row_label = y_labels[y_idx]
+        row = row_label.rjust(y_label_width) + "|"
+        
+        for x_idx in range(x_bins):
+            key = (x_idx, y_idx)
+            if key in grid:
+                value = grid[key]
+                if char_idx is not None:
+                    idx = char_idx
+                else:
+                    normalized = (value - min_val) / (max_val - min_val)
+                    idx = int(normalized * (len(chars) - 1))
+                    idx = max(0, min(idx, len(chars) - 1))
+                char = chars[idx]
+            else:
+                char = " "
+            
+            row += (char * x_label_width) + " "
+        
+        lines.append(row)
+    
+    # Add scale info
+    lines.append("")
+    
+    if x_is_numeric:
+        x_min = min(float(x) for x in x_values_raw)
+        x_max = max(float(x) for x in x_values_raw)
+        lines.append(f"X-axis: {x_min:.6g} to {x_max:.6g}")
+    if y_is_numeric:
+        y_min = min(float(y) for y in y_values_raw)
+        y_max = max(float(y) for y in y_values_raw)
+        lines.append(f"Y-axis: {y_min:.6g} to {y_max:.6g}")
+    
+    lines.append(f"Value scale: {chars[0]}={min_val:.6g} to {chars[-1]}={max_val:.6g}")
+    
+    return "\n".join(lines)

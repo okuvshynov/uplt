@@ -88,6 +88,12 @@ def parse_chart_command(args: List[str]) -> Tuple[str, dict]:
     
     chart_type = args[0]
     
+    # Map short versions to full chart types
+    chart_aliases = {
+        'hm': 'heatmap'
+    }
+    chart_type = chart_aliases.get(chart_type, chart_type)
+    
     if chart_type == "heatmap":
         if len(args) < 3:
             raise ValueError("Heatmap requires at least x_field and y_field")

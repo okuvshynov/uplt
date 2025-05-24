@@ -149,3 +149,7 @@ cython_debug/
 *.swp
 *.swo
 *~
+
+# ctags
+tags
+tags.lock

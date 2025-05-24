@@ -11,13 +11,15 @@ def main():
         description='Execute SQL queries on CSV data from stdin or create terminal charts',
         epilog='Examples:\n'
                '  SQL query: cat data.csv | uplt query "SELECT * FROM data"\n'
-               '  Heatmap: cat data.csv | uplt heatmap x_field y_field "avg(value)"\n',
+               '  SQL query (short): cat data.csv | uplt q "SELECT * FROM data"\n'
+               '  Heatmap: cat data.csv | uplt heatmap x_field y_field "avg(value)"\n'
+               '  Heatmap (short): cat data.csv | uplt hm x_field y_field "avg(value)"\n',
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     
     # Make command positional but with nargs='*' to handle variable arguments
     parser.add_argument('command', nargs='*', 
-                       help='Command: "query" for SQL or chart type (e.g., "heatmap")')
+                       help='Command: "query"/"q" for SQL or chart type (e.g., "heatmap"/"hm")')
     parser.add_argument('--table-name', '-t', default='data', 
                        help='Name for the SQLite table (default: data)')
     parser.add_argument('--delimiter', '-d', 
@@ -66,6 +68,13 @@ def main():
         
         # Determine mode and execute
         command_type = args.command[0]
+        
+        # Map short versions to full commands
+        command_aliases = {
+            'q': 'query',
+            'hm': 'heatmap'
+        }
+        command_type = command_aliases.get(command_type, command_type)
         
         if command_type == "query":
             # Raw SQL mode

@@ -62,6 +62,15 @@ cat data/test.csv | uplt query "SELECT department, AVG(salary) FROM data GROUP B
 cat data.csv | uplt -t employees query "SELECT * FROM employees WHERE department = 'Engineering'"
 ```
 
+#### Working with headerless CSV files
+```bash
+# Auto-detection will recognize this as headerless data
+echo -e "1,100,200\n2,150,300\n3,200,400" | uplt query "SELECT f1, f2+f3 as total FROM data"
+
+# Or explicitly specify no headers
+cat no_headers.csv | uplt --no-header query "SELECT f1, f2 FROM data WHERE f3 > 100"
+```
+
 ### Charts
 
 #### Basic heatmap (counts occurrences)
@@ -86,11 +95,20 @@ The heatmap uses Unicode block characters (░▒▓█) to show intensity. It a
 
 - `--table-name`, `-t`: Name for the SQLite table (default: data)
 - `--delimiter`, `-d`: CSV delimiter (auto-detected if not specified)
-- `--no-headers`: Treat first row as data, not headers (columns named f1, f2, ..., fn)
+- `--header`: Force treating first row as headers
+- `--no-header`: Force treating first row as data (columns named f1, f2, ..., fn)
 - `--verbose`, `-v`: Show additional information (including generated SQL for charts)
+
+### Header Detection
+
+By default, uplt automatically detects whether the first row contains headers by analyzing the data:
+- If the first row contains mostly text and subsequent rows contain more numeric values, it's treated as headers
+- If the first row contains mostly numeric values (≥70%), it's treated as data
+- Use `--header` or `--no-header` to override auto-detection
 
 ## Features
 
+- Automatic CSV header detection
 - Automatic delimiter detection (comma, semicolon, tab, space, pipe)
 - Column type inference (INTEGER, REAL, TEXT)
 - Sanitized column names for valid SQL identifiers

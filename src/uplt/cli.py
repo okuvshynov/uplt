@@ -24,8 +24,12 @@ def main():
                        help='Name for the SQLite table (default: data)')
     parser.add_argument('--delimiter', '-d', 
                        help='CSV delimiter (auto-detected if not specified)')
-    parser.add_argument('--no-headers', action='store_true',
-                       help='Treat first row as data, not headers')
+    # Create mutually exclusive group for header options
+    header_group = parser.add_mutually_exclusive_group()
+    header_group.add_argument('--header', action='store_true',
+                             help='Force treating first row as headers')
+    header_group.add_argument('--no-header', action='store_true',
+                             help='Force treating first row as data')
     parser.add_argument('--verbose', '-v', action='store_true',
                        help='Show additional information')
     
@@ -58,7 +62,15 @@ def main():
         if args.verbose:
             print(f"Creating table '{args.table_name}'...", file=sys.stderr)
         
-        headers = create_table_from_csv(cursor, csv_data, args.table_name, args.no_headers)
+        # Determine header mode
+        if args.header:
+            header_mode = 'yes'
+        elif args.no_header:
+            header_mode = 'no'
+        else:
+            header_mode = 'auto'
+        
+        headers = create_table_from_csv(cursor, csv_data, args.table_name, header_mode)
         
         if args.verbose:
             print(f"Table created with columns: {', '.join(headers)}", file=sys.stderr)

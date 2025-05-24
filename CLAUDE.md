@@ -45,8 +45,14 @@ Configuration files:
 ```bash
 cat data/test.csv | uplt query "SELECT * FROM data WHERE age > 30"
 
-# With no headers (columns named f1, f2, ..., fn)
-cat data/no_headers.csv | uplt --no-headers query "SELECT f1, f2 FROM data WHERE f3 > 100"
+# Auto-detection will recognize headerless CSV files
+echo -e "1,10,100\n2,20,200" | uplt query "SELECT * FROM data"
+
+# Force header interpretation
+cat data.csv | uplt --header query "SELECT * FROM data"
+
+# Force no headers (columns named f1, f2, ..., fn)
+cat data.csv | uplt --no-header query "SELECT f1, f2 FROM data WHERE f3 > 100"
 ```
 
 ### Chart Mode (Heatmap)
@@ -82,9 +88,16 @@ cat data/test.csv | uplt heatmap department age "max(salary)"
 - Sanitizes field names but doesn't fully prevent SQL injection (future improvement)
 
 ### CSV Handling
-- **No Headers Support**: The `--no-headers` flag treats the first row as data
-  - Columns are automatically named f1, f2, ..., fn
-  - Useful for data files without header rows
+- **Automatic Header Detection**: By default, uplt automatically detects whether the first row contains headers
+  - Analyzes the first few rows to determine if the first row is likely headers
+  - Compares numeric field counts between rows
+  - If first row has no numeric fields but second row does → headers exist
+  - If first row is ≥70% numeric → no headers
+- **Manual Header Control**: Use flags to override auto-detection
+  - `--header`: Force treating first row as headers
+  - `--no-header`: Force treating first row as data
+  - Columns without headers are automatically named f1, f2, ..., fn
+- **Header Detection Implementation**: See `auto_detect_headers()` in `core.py`
 
 ## Future Enhancements
 - Add more chart types (bar charts, line charts, scatter plots)

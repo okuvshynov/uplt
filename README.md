@@ -80,12 +80,13 @@ The heatmap uses Unicode block characters (░▒▓█) to show intensity. It a
 - Numeric axes are displayed with proper scales and binning
 - Categorical axes show distinct values
 - Sparse numeric data is handled with interpolated bins
+- The legend shows exact value ranges for each character (e.g., '░': [10, 20))
 
 ## Options
 
 - `--table-name`, `-t`: Name for the SQLite table (default: data)
 - `--delimiter`, `-d`: CSV delimiter (auto-detected if not specified)
-- `--no-headers`: Treat first row as data, not headers
+- `--no-headers`: Treat first row as data, not headers (columns named f1, f2, ..., fn)
 - `--verbose`, `-v`: Show additional information (including generated SQL for charts)
 
 ## Features

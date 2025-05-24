@@ -8,7 +8,45 @@ from uplt.core import (
     create_table_from_csv,
     execute_query,
     format_output,
+    auto_detect_headers,
 )
+
+
+class TestAutoDetectHeaders:
+    def test_detect_headers_with_text_headers(self):
+        # Clear headers with text in first row
+        rows = [['name', 'age', 'salary'], ['John', '25', '50000'], ['Jane', '30', '65000']]
+        assert auto_detect_headers(rows) == True
+    
+    def test_detect_no_headers_all_numeric(self):
+        # All numeric data
+        rows = [['1', '10', '100'], ['2', '20', '200'], ['3', '30', '300']]
+        assert auto_detect_headers(rows) == False
+    
+    def test_detect_headers_mixed_types(self):
+        # First row has mix of text/numbers, second row mostly numbers
+        rows = [['id', 'value1', 'value2'], ['1', '100', '200'], ['2', '300', '400']]
+        assert auto_detect_headers(rows) == True
+    
+    def test_detect_no_headers_mostly_numeric_first_row(self):
+        # First row is 75% numeric
+        rows = [['1', '2', '3', 'text'], ['4', '5', '6', 'more'], ['7', '8', '9', 'data']]
+        assert auto_detect_headers(rows) == False
+    
+    def test_detect_headers_empty_values(self):
+        # Handle empty values gracefully
+        rows = [['', 'header2', ''], ['1', '2', '3'], ['4', '5', '6']]
+        assert auto_detect_headers(rows) == True
+    
+    def test_detect_single_row(self):
+        # Not enough data to detect
+        rows = [['header1', 'header2', 'header3']]
+        assert auto_detect_headers(rows) == True
+    
+    def test_detect_empty_rows(self):
+        # Edge case: empty list
+        rows = []
+        assert auto_detect_headers(rows) == True
 
 
 class TestDetectDelimiter:
@@ -111,7 +149,7 @@ class TestCreateTableFromCSV:
     
     def test_custom_table_name(self):
         csv_data = "col1,col2\nval1,val2"
-        headers = create_table_from_csv(self.cursor, csv_data, "custom_table")
+        headers = create_table_from_csv(self.cursor, csv_data, "custom_table", header_mode='yes')
         
         # Check custom table was created
         self.cursor.execute("SELECT COUNT(*) FROM custom_table")
@@ -119,7 +157,7 @@ class TestCreateTableFromCSV:
     
     def test_csv_with_special_headers(self):
         csv_data = "First Name,Last-Name,Age (years),2024\nJohn,Doe,25,Yes"
-        headers = create_table_from_csv(self.cursor, csv_data)
+        headers = create_table_from_csv(self.cursor, csv_data, header_mode='yes')
         
         assert headers == ["First_Name", "Last_Name", "Age__years_", "col_2024"]
     
@@ -141,7 +179,7 @@ class TestCreateTableFromCSV:
     
     def test_no_headers_mode(self):
         csv_data = "John,25,50000\nJane,30,65000\nBob,35,70000"
-        headers = create_table_from_csv(self.cursor, csv_data, no_headers=True)
+        headers = create_table_from_csv(self.cursor, csv_data, header_mode='no')
         
         # Check generated headers
         assert headers == ["f1", "f2", "f3"]
@@ -157,9 +195,38 @@ class TestCreateTableFromCSV:
         assert rows[1] == ('Jane', 30, 65000)
         assert rows[2] == ('Bob', 35, 70000)
     
+    def test_yes_headers_mode(self):
+        csv_data = "name,age,salary\nJohn,25,50000\nJane,30,65000"
+        headers = create_table_from_csv(self.cursor, csv_data, header_mode='yes')
+        
+        assert headers == ["name", "age", "salary"]
+        
+        self.cursor.execute("SELECT COUNT(*) FROM data")
+        assert self.cursor.fetchone()[0] == 2
+    
+    def test_auto_detect_with_headers(self):
+        # This should detect headers (first row has text, second row has numbers)
+        csv_data = "name,age,salary\nJohn,25,50000\nJane,30,65000"
+        headers = create_table_from_csv(self.cursor, csv_data, header_mode='auto')
+        
+        assert headers == ["name", "age", "salary"]
+        
+        self.cursor.execute("SELECT COUNT(*) FROM data")
+        assert self.cursor.fetchone()[0] == 2
+    
+    def test_auto_detect_without_headers(self):
+        # This should detect no headers (all numeric data)
+        csv_data = "1,10,100\n2,20,200\n3,30,300"
+        headers = create_table_from_csv(self.cursor, csv_data, header_mode='auto')
+        
+        assert headers == ["f1", "f2", "f3"]
+        
+        self.cursor.execute("SELECT COUNT(*) FROM data")
+        assert self.cursor.fetchone()[0] == 3
+    
     def test_no_headers_single_row(self):
         csv_data = "value1,value2,value3"
-        headers = create_table_from_csv(self.cursor, csv_data, no_headers=True)
+        headers = create_table_from_csv(self.cursor, csv_data, header_mode='no')
         
         assert headers == ["f1", "f2", "f3"]
         
@@ -171,7 +238,7 @@ class TestCreateTableFromCSV:
     
     def test_no_headers_different_column_counts(self):
         csv_data = "a,b,c,d,e\n1,2,3\n4,5,6,7,8,9,10"
-        headers = create_table_from_csv(self.cursor, csv_data, no_headers=True)
+        headers = create_table_from_csv(self.cursor, csv_data, header_mode='no')
         
         # Headers based on first row
         assert headers == ["f1", "f2", "f3", "f4", "f5"]

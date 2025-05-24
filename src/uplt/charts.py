@@ -262,7 +262,22 @@ def create_heatmap(
     if y_is_numeric:
         lines.append(f"Y-axis: {y_min:.6g} to {y_max:.6g}")
     
-    lines.append(f"Value scale: {chars[0]}={min_val:.6g} to {chars[-1]}={max_val:.6g}")
+    # Create legend showing range for each character
+    if min_val == max_val:
+        lines.append(f"Value scale: All values = {min_val:.6g}")
+    else:
+        value_range = max_val - min_val
+        step = value_range / len(chars)
+        legend_parts = []
+        for i, char in enumerate(chars):
+            lower = min_val + i * step
+            upper = min_val + (i + 1) * step
+            if i == len(chars) - 1:
+                # Last character includes the maximum value
+                legend_parts.append(f"'{char}': [{lower:.6g}, {upper:.6g}]")
+            else:
+                legend_parts.append(f"'{char}': [{lower:.6g}, {upper:.6g})")
+        lines.append("Value scale: " + "  ".join(legend_parts))
     
     return "\n".join(lines)
 
@@ -647,6 +662,21 @@ def create_heatmap_without_aggregation(
         y_max = max(float(y) for y in y_values_raw)
         lines.append(f"Y-axis: {y_min:.6g} to {y_max:.6g}")
     
-    lines.append(f"Value scale: {chars[0]}={min_val:.6g} to {chars[-1]}={max_val:.6g}")
+    # Create legend showing range for each character
+    if min_val == max_val:
+        lines.append(f"Value scale: All values = {min_val:.6g}")
+    else:
+        value_range = max_val - min_val
+        step = value_range / len(chars)
+        legend_parts = []
+        for i, char in enumerate(chars):
+            lower = min_val + i * step
+            upper = min_val + (i + 1) * step
+            if i == len(chars) - 1:
+                # Last character includes the maximum value
+                legend_parts.append(f"'{char}': [{lower:.6g}, {upper:.6g}]")
+            else:
+                legend_parts.append(f"'{char}': [{lower:.6g}, {upper:.6g})")
+        lines.append("Value scale: " + "  ".join(legend_parts))
     
     return "\n".join(lines)

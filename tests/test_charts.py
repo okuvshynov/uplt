@@ -98,8 +98,9 @@ class TestCreateHeatmap:
         ]
         result = create_heatmap(data, chars=".oO@")
         
-        # Check custom characters are used
-        assert "Value scale: .=10 to @=90" in result
+        # Check custom characters are used in the new legend format
+        assert "'.': [10," in result
+        assert "'@': [" in result and "90]" in result
     
     def test_numeric_labels(self):
         data = [
@@ -275,8 +276,9 @@ class TestFormatChartOutput:
         ]
         result = format_chart_output("heatmap", data, chars=".oO@")
         
-        # Should pass kwargs to create_heatmap
-        assert ".=10 to @=90" in result
+        # Should pass kwargs to create_heatmap with new legend format
+        assert "'.': [10," in result
+        assert "'@': [" in result and "90]" in result
 
 
 class TestHeatmapAggregation:

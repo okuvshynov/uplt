@@ -44,6 +44,9 @@ Configuration files:
 ### SQL Query Mode
 ```bash
 cat data/test.csv | uplt query "SELECT * FROM data WHERE age > 30"
+
+# With no headers (columns named f1, f2, ..., fn)
+cat data/no_headers.csv | uplt --no-headers query "SELECT f1, f2 FROM data WHERE f3 > 100"
 ```
 
 ### Chart Mode (Heatmap)
@@ -53,6 +56,9 @@ cat data/test.csv | uplt heatmap department age
 
 # With aggregation
 cat data/test.csv | uplt heatmap department age "avg(salary)"
+cat data/test.csv | uplt heatmap department age "sum(salary)"
+cat data/test.csv | uplt heatmap department age "min(salary)"
+cat data/test.csv | uplt heatmap department age "max(salary)"
 ```
 
 ## Implementation Notes
@@ -61,17 +67,24 @@ cat data/test.csv | uplt heatmap department age "avg(salary)"
 - Uses Unicode block characters: ░▒▓█
 - Automatically normalizes values to character intensity
 - Handles missing cells and non-numeric values gracefully
-- **NEW**: Automatic axis type detection:
+- **Automatic axis type detection:**
   - Numeric axes: Creates proper scales with binning (e.g., 0-10, 10-20, etc.)
   - Categorical axes: Shows distinct values as-is
   - Mixed mode: Can have one numeric and one categorical axis
 - Sparse numeric data is properly binned into the grid
-- Fixed: All data points are now correctly displayed, including edge values at scale boundaries
+- All data points are correctly displayed, including edge values at scale boundaries
+- **Enhanced legend**: Shows exact value ranges for each character (e.g., '░': [10, 20))
+- **SQL-based aggregation**: Respects user's chosen aggregation function (sum, avg, min, max) without double aggregation
 
 ### SQL Query Builder
 - Parses aggregation functions: avg(), sum(), min(), max(), count()
 - Generates appropriate GROUP BY queries for charts
 - Sanitizes field names but doesn't fully prevent SQL injection (future improvement)
+
+### CSV Handling
+- **No Headers Support**: The `--no-headers` flag treats the first row as data
+  - Columns are automatically named f1, f2, ..., fn
+  - Useful for data files without header rows
 
 ## Future Enhancements
 - Add more chart types (bar charts, line charts, scatter plots)

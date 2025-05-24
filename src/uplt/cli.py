@@ -58,7 +58,7 @@ def main():
         if args.verbose:
             print(f"Creating table '{args.table_name}'...", file=sys.stderr)
         
-        headers = create_table_from_csv(cursor, csv_data, args.table_name)
+        headers = create_table_from_csv(cursor, csv_data, args.table_name, args.no_headers)
         
         if args.verbose:
             print(f"Table created with columns: {', '.join(headers)}", file=sys.stderr)

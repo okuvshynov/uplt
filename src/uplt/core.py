@@ -60,8 +60,18 @@ def infer_column_type(values: List[Any]) -> str:
     return 'TEXT'
 
 
-def create_table_from_csv(cursor: sqlite3.Cursor, csv_data: str, table_name: str = 'data') -> List[str]:
-    """Create and populate an SQLite table from CSV data."""
+def create_table_from_csv(cursor: sqlite3.Cursor, csv_data: str, table_name: str = 'data', no_headers: bool = False) -> List[str]:
+    """Create and populate an SQLite table from CSV data.
+    
+    Args:
+        cursor: SQLite cursor
+        csv_data: CSV data as string
+        table_name: Name for the created table
+        no_headers: If True, treat first row as data and generate f1, f2, ... column names
+    
+    Returns:
+        List of column names
+    """
     
     # Detect delimiter
     delimiter = detect_delimiter(csv_data)
@@ -70,12 +80,22 @@ def create_table_from_csv(cursor: sqlite3.Cursor, csv_data: str, table_name: str
     csv_reader = csv.reader(io.StringIO(csv_data), delimiter=delimiter)
     
     try:
-        # Get headers
-        headers = next(csv_reader)
-        headers = [sanitize_column_name(h) for h in headers]
+        # Read all rows first
+        all_rows = list(csv_reader)
         
-        # Read all data to infer types
-        rows = list(csv_reader)
+        if not all_rows:
+            raise ValueError("No data found in CSV")
+        
+        # Determine headers and data rows
+        if no_headers:
+            # Generate column names f1, f2, ..., fn
+            num_columns = len(all_rows[0])
+            headers = [f"f{i+1}" for i in range(num_columns)]
+            rows = all_rows
+        else:
+            # First row contains headers
+            headers = [sanitize_column_name(h) for h in all_rows[0]]
+            rows = all_rows[1:]
         
         if not rows:
             raise ValueError("No data rows found in CSV")

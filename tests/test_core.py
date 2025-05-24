@@ -138,6 +138,47 @@ class TestCreateTableFromCSV:
         csv_data = "header1,header2"
         with pytest.raises(ValueError, match="No data rows found"):
             create_table_from_csv(self.cursor, csv_data)
+    
+    def test_no_headers_mode(self):
+        csv_data = "John,25,50000\nJane,30,65000\nBob,35,70000"
+        headers = create_table_from_csv(self.cursor, csv_data, no_headers=True)
+        
+        # Check generated headers
+        assert headers == ["f1", "f2", "f3"]
+        
+        # Check table was created with all data
+        self.cursor.execute("SELECT COUNT(*) FROM data")
+        assert self.cursor.fetchone()[0] == 3
+        
+        # Check data
+        self.cursor.execute("SELECT * FROM data ORDER BY f2")
+        rows = self.cursor.fetchall()
+        assert rows[0] == ('John', 25, 50000)
+        assert rows[1] == ('Jane', 30, 65000)
+        assert rows[2] == ('Bob', 35, 70000)
+    
+    def test_no_headers_single_row(self):
+        csv_data = "value1,value2,value3"
+        headers = create_table_from_csv(self.cursor, csv_data, no_headers=True)
+        
+        assert headers == ["f1", "f2", "f3"]
+        
+        self.cursor.execute("SELECT COUNT(*) FROM data")
+        assert self.cursor.fetchone()[0] == 1
+        
+        self.cursor.execute("SELECT * FROM data")
+        assert self.cursor.fetchone() == ('value1', 'value2', 'value3')
+    
+    def test_no_headers_different_column_counts(self):
+        csv_data = "a,b,c,d,e\n1,2,3\n4,5,6,7,8,9,10"
+        headers = create_table_from_csv(self.cursor, csv_data, no_headers=True)
+        
+        # Headers based on first row
+        assert headers == ["f1", "f2", "f3", "f4", "f5"]
+        
+        # All rows should be present
+        self.cursor.execute("SELECT COUNT(*) FROM data")
+        assert self.cursor.fetchone()[0] == 3
 
 
 class TestExecuteQuery:

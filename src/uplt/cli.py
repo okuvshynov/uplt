@@ -99,20 +99,19 @@ def main():
                 
                 # Build appropriate query based on chart type
                 if chart_type == "heatmap":
-                    query = build_heatmap_query(
+                    # Import here to avoid circular dependency
+                    from .charts import create_heatmap_with_proper_aggregation
+                    
+                    chart = create_heatmap_with_proper_aggregation(
+                        cursor,
                         options["x_field"],
                         options["y_field"],
                         options["value_field"],
-                        args.table_name
+                        args.table_name,
+                        verbose=args.verbose
                     )
                     
-                    if args.verbose:
-                        print(f"Generated query: {query}", file=sys.stderr)
-                    
-                    results = execute_query(cursor, query)
-                    
-                    if results:
-                        chart = format_chart_output(chart_type, results)
+                    if chart:
                         print(chart)
                     else:
                         print("No data to plot.", file=sys.stderr)

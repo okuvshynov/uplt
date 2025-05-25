@@ -286,24 +286,6 @@ def create_heatmap(
     return "\n".join(lines)
 
 
-def format_chart_output(chart_type: str, data: List[Tuple], **kwargs) -> str:
-    """
-    Format data into the requested chart type.
-    
-    Args:
-        chart_type: Type of chart to create
-        data: Query results
-        **kwargs: Additional chart-specific options
-    
-    Returns:
-        Formatted chart as string
-    """
-    if chart_type == "heatmap":
-        return create_heatmap(data, **kwargs)
-    else:
-        raise ValueError(f"Unknown chart type: {chart_type}")
-
-
 def create_heatmap_with_proper_aggregation(
     cursor: sqlite3.Cursor,
     x_field: str,

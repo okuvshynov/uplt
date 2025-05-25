@@ -15,7 +15,6 @@ from .query_builder import (
 )
 from .charts import (
     create_heatmap,
-    format_chart_output,
 )
 
 __all__ = [
@@ -29,5 +28,4 @@ __all__ = [
     "build_heatmap_query",
     "parse_chart_command",
     "create_heatmap",
-    "format_chart_output",
 ]

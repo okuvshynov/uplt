@@ -1,6 +1,6 @@
 import pytest
 import sqlite3
-from uplt.charts import create_heatmap, format_chart_output, is_numeric_axis, create_numeric_scale, find_bin_index
+from uplt.charts import create_heatmap, is_numeric_axis, create_numeric_scale, find_bin_index
 
 
 class TestCreateHeatmap:
@@ -251,37 +251,6 @@ class TestNumericHeatmap:
         # Should have at least 4 rows with data
         filled_rows = [row for row in data_rows if any(c in row for c in "░▒▓█")]
         assert len(filled_rows) == 4, f"Expected 4 filled rows, got {len(filled_rows)}"
-
-
-class TestFormatChartOutput:
-    def test_heatmap_format(self):
-        data = [
-            ("A", "X", 10),
-            ("B", "Y", 20),
-        ]
-        result = format_chart_output("heatmap", data)
-        
-        # Should call create_heatmap
-        assert "Value scale:" in result
-        assert "A" in result
-        assert "B" in result
-    
-    def test_unknown_chart_type(self):
-        data = [("A", "X", 10)]
-        
-        with pytest.raises(ValueError, match="Unknown chart type: barchart"):
-            format_chart_output("barchart", data)
-    
-    def test_format_with_kwargs(self):
-        data = [
-            ("A", "X", 10),
-            ("B", "Y", 90),
-        ]
-        result = format_chart_output("heatmap", data, chars=".oO@")
-        
-        # Should pass kwargs to create_heatmap with new legend format
-        assert "'.': [0," in result  # Scale starts at 0
-        assert "'@': [" in result and "90]" in result
 
 
 class TestZeroScaleHeatmap:

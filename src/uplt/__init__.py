@@ -13,9 +13,6 @@ from .query_builder import (
     build_heatmap_query,
     parse_chart_command,
 )
-from .charts import (
-    create_heatmap,
-)
 
 __all__ = [
     "detect_delimiter",
@@ -27,5 +24,4 @@ __all__ = [
     "parse_aggregation",
     "build_heatmap_query",
     "parse_chart_command",
-    "create_heatmap",
 ]

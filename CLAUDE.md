@@ -81,6 +81,10 @@ cat data/test.csv | uplt heatmap department age "max(salary)"
 - All data points are correctly displayed, including edge values at scale boundaries
 - **Enhanced legend**: Shows exact value ranges for each character (e.g., '░': [10, 20))
 - **SQL-based aggregation**: Respects user's chosen aggregation function (sum, avg, min, max) without double aggregation
+- **Zero-based scale for non-negative data**: When all values are ≥ 0, the scale starts at 0 to properly distinguish between no data (space) and small positive values
+- **Verbose mode support**: Use `-v` or `--verbose` flag to see:
+  - Generated SQL query
+  - Complete list of aggregated data points as `(x, y) -> value`
 
 ### SQL Query Builder
 - Parses aggregation functions: avg(), sum(), min(), max(), count()

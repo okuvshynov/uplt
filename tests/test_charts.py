@@ -50,8 +50,11 @@ class TestCreateHeatmap:
         
         # Should handle None values gracefully
         assert "Value scale:" in result
-        assert "10" in result
-        assert "40" in result
+        # Values should be mapped to proper scale starting at 0
+        lines = result.split("\n")
+        # Should show numeric values in scale legend
+        scale_line = [l for l in lines if "Value scale:" in l][0]
+        assert "40]" in scale_line  # Max value should be in legend
     
     def test_empty_data(self):
         data = []
@@ -99,7 +102,7 @@ class TestCreateHeatmap:
         result = create_heatmap(data, chars=".oO@")
         
         # Check custom characters are used in the new legend format
-        assert "'.': [10," in result
+        assert "'.': [0," in result  # Scale starts at 0
         assert "'@': [" in result and "90]" in result
     
     def test_numeric_labels(self):
@@ -277,8 +280,77 @@ class TestFormatChartOutput:
         result = format_chart_output("heatmap", data, chars=".oO@")
         
         # Should pass kwargs to create_heatmap with new legend format
-        assert "'.': [10," in result
+        assert "'.': [0," in result  # Scale starts at 0
         assert "'@': [" in result and "90]" in result
+
+
+class TestZeroScaleHeatmap:
+    """Test that heatmaps with non-negative values start scale at 0."""
+    
+    def test_scale_starts_at_zero_for_positive_data(self):
+        # Data with values 1 and 2 - scale should start at 0
+        data = [
+            ("A", "X", 1),
+            ("A", "Y", 2),
+            ("B", "X", 1),
+            ("B", "Y", 2),
+        ]
+        result = create_heatmap(data)
+        
+        # Check the value scale starts at 0
+        assert "' ': [0," in result
+        # Values 1 and 2 should map to different characters
+        lines = result.split("\n")
+        data_lines = [l for l in lines if "|" in l]
+        # Should have different characters for 1 and 2
+        chars_used = set()
+        for line in data_lines:
+            for c in "░▒▓█":
+                if c in line:
+                    chars_used.add(c)
+        # At least 2 different characters should be used
+        assert len(chars_used) >= 2, f"Expected at least 2 different chars, got {chars_used}"
+    
+    def test_scale_with_zero_values(self):
+        # Data including actual zeros
+        data = [
+            ("A", "X", 0),
+            ("A", "Y", 1),
+            ("B", "X", 2),
+            ("B", "Y", 0),
+        ]
+        result = create_heatmap(data)
+        
+        # Check the value scale starts at 0
+        assert "' ': [0," in result
+        # Should show all three distinct values
+        assert "Value scale:" in result
+    
+    def test_scale_with_negative_values(self):
+        # Data with negative values - scale should NOT be forced to 0
+        data = [
+            ("A", "X", -5),
+            ("A", "Y", 0),
+            ("B", "X", 5),
+            ("B", "Y", 10),
+        ]
+        result = create_heatmap(data)
+        
+        # Scale should start at -5, not 0
+        assert "' ': [-5," in result
+    
+    def test_all_zero_values(self):
+        # All values are zero
+        data = [
+            ("A", "X", 0),
+            ("A", "Y", 0),
+            ("B", "X", 0),
+            ("B", "Y", 0),
+        ]
+        result = create_heatmap(data)
+        
+        # Should handle all zeros
+        assert "All values = 0" in result
 
 
 class TestHeatmapAggregation:

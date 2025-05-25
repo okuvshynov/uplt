@@ -44,6 +44,8 @@ Configuration files:
 ### SQL Query Mode
 ```bash
 cat data/test.csv | uplt query "SELECT * FROM data WHERE age > 30"
+# Short form
+cat data/test.csv | uplt q "SELECT * FROM data WHERE age > 30"
 
 # Auto-detection will recognize headerless CSV files
 echo -e "1,10,100\n2,20,200" | uplt query "SELECT * FROM data"
@@ -53,18 +55,26 @@ cat data.csv | uplt --header query "SELECT * FROM data"
 
 # Force no headers (columns named f1, f2, ..., fn)
 cat data.csv | uplt --no-header query "SELECT f1, f2 FROM data WHERE f3 > 100"
+
+# Verbose mode shows the generated SQL
+cat data.csv | uplt -v query "SELECT * FROM data"
 ```
 
 ### Chart Mode (Heatmap)
 ```bash
 # Count occurrences
 cat data/test.csv | uplt heatmap department age
+# Short form
+cat data/test.csv | uplt hm department age
 
 # With aggregation
 cat data/test.csv | uplt heatmap department age "avg(salary)"
 cat data/test.csv | uplt heatmap department age "sum(salary)"
 cat data/test.csv | uplt heatmap department age "min(salary)"
 cat data/test.csv | uplt heatmap department age "max(salary)"
+
+# Verbose mode shows generated SQL and data points
+cat data/test.csv | uplt -v heatmap department age "sum(salary)"
 ```
 
 ## Implementation Notes
@@ -102,6 +112,21 @@ cat data/test.csv | uplt heatmap department age "max(salary)"
   - `--no-header`: Force treating first row as data
   - Columns without headers are automatically named f1, f2, ..., fn
 - **Header Detection Implementation**: See `auto_detect_headers()` in `core.py`
+
+## Recent Changes (2025)
+
+### Major Refactoring
+- **PR #9 & #8**: Significant codebase cleanup removing ~800 lines of unused/duplicate code
+- Simplified query building architecture
+- Consolidated chart rendering logic
+
+### Feature Improvements
+- **Short command aliases**: Use `q` for `query` and `hm` for `heatmap`
+- **Verbose mode**: Added `-v`/`--verbose` flag to display generated SQL queries and data points
+- **Automatic header detection**: Intelligently determines if CSV has headers (PR #6)
+- **Enhanced heatmap legend**: Shows exact value ranges for each character (PR #5)
+- **Fixed aggregation**: Proper SQL-based aggregation without double processing (PR #4)
+- **Zero-based scale**: For non-negative data, scale starts at 0 for better visualization (PR #7)
 
 ## Future Enhancements
 - Add more chart types (bar charts, line charts, scatter plots)

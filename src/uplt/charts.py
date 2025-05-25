@@ -192,6 +192,10 @@ def create_heatmap(
     min_val = min(all_values)
     max_val = max(all_values)
     
+    # For non-negative data, ensure scale starts at 0
+    if min_val >= 0:
+        min_val = 0
+    
     # Handle case where all values are the same
     if min_val == max_val:
         char_idx = len(chars) // 2
@@ -491,6 +495,17 @@ def create_heatmap_with_proper_aggregation(
             else:
                 transformed_data.append(row)
         
+        # Print aggregated data points in verbose mode
+        if verbose and transformed_data:
+            print("\nAggregated data points:", file=sys.stderr)
+            for x_val, y_val, value in sorted(transformed_data):
+                # Format the values nicely
+                x_str = f"{x_val:.6g}" if isinstance(x_val, (int, float)) else str(x_val)
+                y_str = f"{y_val:.6g}" if isinstance(y_val, (int, float)) else str(y_val)
+                value_str = f"{value:.6g}" if isinstance(value, (int, float)) else str(value)
+                print(f"  ({x_str}, {y_str}) -> {value_str}", file=sys.stderr)
+            print(file=sys.stderr)  # Empty line for better readability
+        
         # Now create the heatmap without any additional aggregation
         return create_heatmap_without_aggregation(
             transformed_data,
@@ -597,6 +612,10 @@ def create_heatmap_without_aggregation(
     # Find min and max for color scaling
     min_val = min(all_values)
     max_val = max(all_values)
+    
+    # For non-negative data, ensure scale starts at 0
+    if min_val >= 0:
+        min_val = 0
     
     # Build the rest of the heatmap as before
     if min_val == max_val:

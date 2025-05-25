@@ -90,6 +90,7 @@ The heatmap uses Unicode block characters (░▒▓█) to show intensity. It a
 - Categorical axes show distinct values
 - Sparse numeric data is handled with interpolated bins
 - The legend shows exact value ranges for each character (e.g., '░': [10, 20))
+- For non-negative data, the scale starts at 0 to properly distinguish between no data (space) and small positive values
 
 ## Options
 
@@ -97,7 +98,7 @@ The heatmap uses Unicode block characters (░▒▓█) to show intensity. It a
 - `--delimiter`, `-d`: CSV delimiter (auto-detected if not specified)
 - `--header`: Force treating first row as headers
 - `--no-header`: Force treating first row as data (columns named f1, f2, ..., fn)
-- `--verbose`, `-v`: Show additional information (including generated SQL for charts)
+- `--verbose`, `-v`: Show additional information (including generated SQL for charts and aggregated data points)
 
 ### Header Detection
 

@@ -71,7 +71,7 @@ def find_bin_index(value: float, scale: List[float]) -> int:
     return -1
 
 
-def create_heatmap_with_proper_aggregation(
+def create_heatmap(
     cursor: sqlite3.Cursor,
     x_field: str,
     y_field: str, 

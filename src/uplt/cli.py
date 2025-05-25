@@ -111,9 +111,9 @@ def main():
                 # Build appropriate query based on chart type
                 if chart_type == "heatmap":
                     # Import here to avoid circular dependency
-                    from .charts import create_heatmap_with_proper_aggregation
+                    from .charts import create_heatmap
                     
-                    chart = create_heatmap_with_proper_aggregation(
+                    chart = create_heatmap(
                         cursor,
                         options["x_field"],
                         options["y_field"],

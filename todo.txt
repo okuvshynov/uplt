@@ -1,0 +1,34 @@
+let's start working on a new chart/visualization type - horizontal comparison. We'll work on several fields from
+the dataset at a time. Let's call first field 'versions'. Typically there'll be just 2 distinct values across all rows in
+this field. If not, we'll repeat the process for every pair. Second field will be 'metrics'. For each 'metric', there'll
+be a row in the output. The third field is 'value'. It is an optional field and can be aggregated. This is how we'll
+determine the difference. 
+
+Let's start with looking at difference only, and get confidense interval in the next iteration.
+
+Let's look at the example.
+
+model_id,input_size,latency,score
+A,128,10,10
+A,256,18,9
+A,512,31,11
+B,128,12,15
+B,256,25,17
+B,512,55,13
+
+let's say we call 
+
+cat data.csv | uplt cmp model_id input_size score
+
+model_id becomes 'versions' field
+input_size becomes 'metrics' field
+score is 'value'
+
+We'll need to show something like this (without -v):
+
+   | A score | B score | diff
+128| 10      | 15      | -5 (- 33%)
+256| 9       | 17      | -8 (- 47%)
+512| 11      | 13      | -2 (- 15.3%)
+
+

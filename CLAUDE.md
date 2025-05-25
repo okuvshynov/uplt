@@ -77,6 +77,26 @@ cat data/test.csv | uplt heatmap department age "max(salary)"
 cat data/test.csv | uplt -v heatmap department age "sum(salary)"
 ```
 
+### Chart Mode (Comparison)
+```bash
+# Basic comparison between two versions
+cat data/comparison_test.csv | uplt comparison model_id input_size score
+# Short form
+cat data/comparison_test.csv | uplt cmp model_id input_size score
+
+# With aggregation
+cat data/comparison_test.csv | uplt cmp model_id input_size "avg(latency)"
+cat data/comparison_test.csv | uplt cmp model_id input_size "sum(value)"
+cat data/comparison_test.csv | uplt cmp model_id input_size "min(value)"
+cat data/comparison_test.csv | uplt cmp model_id input_size "max(value)"
+
+# Without value field (counts occurrences)
+cat data/comparison_test.csv | uplt cmp model_id input_size
+
+# Verbose mode shows generated SQL and data points
+cat data/comparison_test.csv | uplt -v cmp model_id input_size score
+```
+
 ## Implementation Notes
 
 ### Heatmap Visualization
@@ -101,6 +121,24 @@ cat data/test.csv | uplt -v heatmap department age "sum(salary)"
 - Generates appropriate GROUP BY queries for charts
 - Sanitizes field names but doesn't fully prevent SQL injection (future improvement)
 
+### Comparison Visualization
+- **Purpose**: Compares values between two versions/variants across multiple metrics
+- **Layout**: Table format showing:
+  - First column: metric names
+  - Second column: values from version A
+  - Third column: values from version B
+  - Fourth column: difference (absolute and percentage)
+- **Usage**:
+  - `versions_field`: Field containing version identifiers (typically 2 distinct values)
+  - `metrics_field`: Field containing metric names (rows in the output)
+  - `value_field`: Optional field to aggregate (defaults to COUNT if not specified)
+- **Features**:
+  - Automatic percentage calculation
+  - Handles missing values (defaults to 0)
+  - Supports all aggregation functions: avg(), sum(), min(), max(), count()
+  - Verbose mode shows generated SQL and all data points
+- **Difference Calculation**: B - A, with percentage relative to A
+
 ### CSV Handling
 - **Automatic Header Detection**: By default, uplt automatically detects whether the first row contains headers
   - Analyzes the first few rows to determine if the first row is likely headers
@@ -121,7 +159,8 @@ cat data/test.csv | uplt -v heatmap department age "sum(salary)"
 - Consolidated chart rendering logic
 
 ### Feature Improvements
-- **Short command aliases**: Use `q` for `query` and `hm` for `heatmap`
+- **New comparison chart**: Compare values between two versions/variants with `comparison` or `cmp` command
+- **Short command aliases**: Use `q` for `query`, `hm` for `heatmap`, and `cmp` for `comparison`
 - **Verbose mode**: Added `-v`/`--verbose` flag to display generated SQL queries and data points
 - **Automatic header detection**: Intelligently determines if CSV has headers (PR #6)
 - **Enhanced heatmap legend**: Shows exact value ranges for each character (PR #5)

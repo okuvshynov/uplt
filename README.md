@@ -21,7 +21,7 @@ uv pip install uplt
 
 uplt supports two modes:
 1. **SQL Query Mode**: Execute raw SQL queries on CSV data
-2. **Chart Mode**: Create terminal-based charts from CSV data
+2. **Chart Mode**: Create terminal-based charts from CSV data (heatmaps, comparisons)
 
 ### SQL Query Mode
 
@@ -41,6 +41,9 @@ cat data.csv | uplt heatmap x_field y_field
 
 # Heatmap with aggregation
 cat data.csv | uplt heatmap department age "avg(salary)"
+
+# Compare two versions/models
+cat data.csv | uplt comparison model_id metric_name score
 ```
 
 ## Examples
@@ -92,6 +95,37 @@ The heatmap uses Unicode block characters (░▒▓█) to show intensity. It a
 - The legend shows exact value ranges for each character (e.g., '░': [10, 20))
 - For non-negative data, the scale starts at 0 to properly distinguish between no data (space) and small positive values
 
+#### Comparison chart
+```bash
+# Basic comparison (shows difference in values between two versions)
+cat data/comparison_test.csv | uplt comparison model_id input_size score
+
+# Short form
+cat data/comparison_test.csv | uplt cmp model_id input_size score
+
+# With aggregation
+cat data/comparison_test.csv | uplt cmp model_id input_size "avg(latency)"
+
+# Count occurrences (when no value field specified)
+cat data/comparison_test.csv | uplt cmp model_id category
+```
+
+Output format:
+```
+        | A score | B score | diff
+--------+---------+---------+----------------
+128     | 10      | 15      | +5 (+50.0%)
+256     | 9       | 17      | +8 (+88.9%)
+512     | 11      | 13      | +2 (+18.2%)
+```
+
+The comparison chart:
+- Compares values between exactly 2 versions/variants
+- Shows absolute and percentage differences
+- Calculates difference as: B - A
+- Supports all aggregation functions: avg(), sum(), min(), max()
+- Handles missing values by defaulting to 0
+
 ## Options
 
 - `--table-name`, `-t`: Name for the SQLite table (default: data)
@@ -107,6 +141,20 @@ By default, uplt automatically detects whether the first row contains headers by
 - If the first row contains mostly numeric values (≥70%), it's treated as data
 - Use `--header` or `--no-header` to override auto-detection
 
+## Short Command Aliases
+
+For convenience, uplt provides short aliases for common commands:
+- `q` → `query`
+- `hm` → `heatmap`
+- `cmp` → `comparison`
+
+Example:
+```bash
+cat data.csv | uplt q "SELECT * FROM data"
+cat data.csv | uplt hm x_field y_field
+cat data.csv | uplt cmp version metric value
+```
+
 ## Features
 
 - Automatic CSV header detection
@@ -115,6 +163,8 @@ By default, uplt automatically detects whether the first row contains headers by
 - Sanitized column names for valid SQL identifiers
 - In-memory SQLite database for fast queries
 - Standard CSV output format
+- Multiple chart types: heatmaps and comparisons
+- Verbose mode for debugging with `-v` flag
 
 ## Development
 

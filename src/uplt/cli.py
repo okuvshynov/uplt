@@ -3,7 +3,6 @@ import sqlite3
 import argparse
 from .core import create_table_from_csv, execute_query, format_output
 from .query_builder import parse_chart_command, build_heatmap_query
-from .charts import format_chart_output
 
 
 def main():

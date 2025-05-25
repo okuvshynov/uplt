@@ -26,53 +26,6 @@ def parse_aggregation(field: str) -> Tuple[Optional[str], str]:
     return None, field.strip()
 
 
-def build_heatmap_query(
-    x_field: str,
-    y_field: str,
-    value_field: Optional[str] = None,
-    table_name: str = "data"
-) -> str:
-    """
-    Build SQL query for heatmap data.
-    
-    Args:
-        x_field: Field name for x-axis
-        y_field: Field name for y-axis
-        value_field: Optional field for aggregation (e.g., "avg(price)")
-        table_name: Name of the table to query
-    
-    Returns:
-        SQL query string
-    """
-    # Sanitize field names to prevent SQL injection
-    x_field = x_field.strip()
-    y_field = y_field.strip()
-    
-    if value_field:
-        agg_func, field_name = parse_aggregation(value_field)
-        if agg_func:
-            # Use aggregation function
-            value_expr = f"{agg_func.upper()}({field_name})"
-        else:
-            # Use field directly
-            value_expr = field_name
-    else:
-        # Count rows by default
-        value_expr = "COUNT(*)"
-    
-    query = f"""
-    SELECT 
-        {x_field} as x,
-        {y_field} as y,
-        {value_expr} as value
-    FROM {table_name}
-    GROUP BY {x_field}, {y_field}
-    ORDER BY {y_field}, {x_field}
-    """
-    
-    return query.strip()
-
-
 def parse_chart_command(args: List[str]) -> Tuple[str, dict]:
     """
     Parse chart command arguments.

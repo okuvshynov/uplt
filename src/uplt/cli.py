@@ -2,7 +2,7 @@ import sys
 import sqlite3
 import argparse
 from .core import create_table_from_csv, execute_query, format_output
-from .query_builder import parse_chart_command, build_heatmap_query
+from .query_builder import parse_chart_command
 
 
 def main():
@@ -111,9 +111,9 @@ def main():
                 # Build appropriate query based on chart type
                 if chart_type == "heatmap":
                     # Import here to avoid circular dependency
-                    from .charts import create_heatmap_with_proper_aggregation
+                    from .charts import create_heatmap
                     
-                    chart = create_heatmap_with_proper_aggregation(
+                    chart = create_heatmap(
                         cursor,
                         options["x_field"],
                         options["y_field"],

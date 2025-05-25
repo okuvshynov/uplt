@@ -4,7 +4,7 @@ from uplt.charts import (
     is_numeric_axis, 
     create_numeric_scale, 
     find_bin_index,
-    create_heatmap_with_proper_aggregation
+    create_heatmap
 )
 
 
@@ -80,7 +80,7 @@ class TestHeatmapAggregation:
         self.conn.close()
     
     def test_sum_aggregation(self):
-        result = create_heatmap_with_proper_aggregation(
+        result = create_heatmap(
             self.cursor, "x", "y", "sum(value)", "test_data"
         )
         
@@ -90,7 +90,7 @@ class TestHeatmapAggregation:
         assert "600" in result
     
     def test_avg_aggregation(self):
-        result = create_heatmap_with_proper_aggregation(
+        result = create_heatmap(
             self.cursor, "x", "y", "avg(value)", "test_data"
         )
         
@@ -100,7 +100,7 @@ class TestHeatmapAggregation:
         assert "200" in result
     
     def test_min_aggregation(self):
-        result = create_heatmap_with_proper_aggregation(
+        result = create_heatmap(
             self.cursor, "x", "y", "min(value)", "test_data"
         )
         
@@ -110,7 +110,7 @@ class TestHeatmapAggregation:
         assert "100" in result
     
     def test_max_aggregation(self):
-        result = create_heatmap_with_proper_aggregation(
+        result = create_heatmap(
             self.cursor, "x", "y", "max(value)", "test_data"
         )
         

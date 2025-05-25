@@ -71,7 +71,55 @@ def find_bin_index(value: float, scale: List[float]) -> int:
     return -1
 
 
-def create_heatmap_with_proper_aggregation(
+def build_axis_query(
+    field: str,
+    min_val: Union[float, str, None],
+    max_val: Union[float, str, None],
+    target_bins: int,
+    alias: str
+) -> Tuple[str, Optional[List[float]], bool]:
+    """
+    Build query piece for an axis (either numeric with binning or categorical).
+    
+    Returns:
+        - SQL expression for the axis
+        - Scale (if numeric) or None (if categorical)
+        - Whether the axis is numeric
+    """
+    # Check if axis is numeric
+    is_numeric = False
+    min_num = None
+    max_num = None
+    
+    try:
+        min_num = float(min_val) if min_val is not None else None
+        max_num = float(max_val) if max_val is not None else None
+        if min_num is not None and max_num is not None:
+            is_numeric = True
+    except (ValueError, TypeError):
+        pass
+    
+    if is_numeric:
+        # Create scale and build CASE statement for binning
+        scale = create_numeric_scale(min_num, max_num, target_bins)
+        
+        case_parts = []
+        for i in range(len(scale) - 1):
+            case_parts.append(
+                f"WHEN {field} >= {scale[i]} AND {field} < {scale[i+1]} THEN {i}"
+            )
+        # Handle the last bin edge case
+        case_parts.append(f"WHEN {field} = {scale[-1]} THEN {len(scale)-2}")
+        
+        sql_expr = f"CASE {' '.join(case_parts)} END as {alias}"
+        return sql_expr, scale, True
+    else:
+        # Categorical - just use the field directly
+        sql_expr = f"{field} as {alias}"
+        return sql_expr, None, False
+
+
+def create_heatmap(
     cursor: sqlite3.Cursor,
     x_field: str,
     y_field: str, 
@@ -105,25 +153,13 @@ def create_heatmap_with_proper_aggregation(
         
         x_min, x_max, y_min, y_max = range_results[0]
         
-        # Check if axes are numeric by trying to convert min/max values
-        x_is_numeric = False
-        y_is_numeric = False
-        
-        try:
-            x_min_num = float(x_min) if x_min is not None else None
-            x_max_num = float(x_max) if x_max is not None else None
-            if x_min_num is not None and x_max_num is not None:
-                x_is_numeric = True
-        except (ValueError, TypeError):
-            pass
-            
-        try:
-            y_min_num = float(y_min) if y_min is not None else None
-            y_max_num = float(y_max) if y_max is not None else None
-            if y_min_num is not None and y_max_num is not None:
-                y_is_numeric = True
-        except (ValueError, TypeError):
-            pass
+        # Build query pieces for each axis
+        x_expr, x_scale, x_is_numeric = build_axis_query(
+            x_field, x_min, x_max, width or 20, "x"
+        )
+        y_expr, y_scale, y_is_numeric = build_axis_query(
+            y_field, y_min, y_max, height or 15, "y"
+        )
         
         # Parse the aggregation function if provided
         if value_field:
@@ -136,98 +172,45 @@ def create_heatmap_with_proper_aggregation(
             value_expr = "COUNT(*)"
             agg_func = "count"
         
-        # Build the query based on whether axes are numeric
-        if x_is_numeric and y_is_numeric:
-            # Both axes numeric - need binning
-            x_scale = create_numeric_scale(x_min_num, x_max_num, width or 20)
-            y_scale = create_numeric_scale(y_min_num, y_max_num, height or 15)
-            
-            # Build CASE statements for binning
-            x_case_parts = []
-            for i in range(len(x_scale) - 1):
-                x_case_parts.append(
-                    f"WHEN {x_field} >= {x_scale[i]} AND {x_field} < {x_scale[i+1]} THEN {i}"
-                )
-            # Handle the last bin edge case
-            x_case_parts.append(f"WHEN {x_field} = {x_scale[-1]} THEN {len(x_scale)-2}")
-            x_case = f"CASE {' '.join(x_case_parts)} END"
-            
-            y_case_parts = []
-            for i in range(len(y_scale) - 1):
-                y_case_parts.append(
-                    f"WHEN {y_field} >= {y_scale[i]} AND {y_field} < {y_scale[i+1]} THEN {i}"
-                )
-            y_case_parts.append(f"WHEN {y_field} = {y_scale[-1]} THEN {len(y_scale)-2}")
-            y_case = f"CASE {' '.join(y_case_parts)} END"
-            
-            query = f"""
-            SELECT 
-                {x_case} as x_bin,
-                {y_case} as y_bin,
-                {value_expr} as value
-            FROM {table_name}
-            WHERE ({x_field} IS NOT NULL) AND ({y_field} IS NOT NULL)
-            GROUP BY x_bin, y_bin
-            HAVING x_bin IS NOT NULL AND y_bin IS NOT NULL
-            """
-            
-        elif x_is_numeric and not y_is_numeric:
-            # X numeric, Y categorical
-            x_scale = create_numeric_scale(x_min_num, x_max_num, width or 20)
-            
-            x_case_parts = []
-            for i in range(len(x_scale) - 1):
-                x_case_parts.append(
-                    f"WHEN {x_field} >= {x_scale[i]} AND {x_field} < {x_scale[i+1]} THEN {i}"
-                )
-            x_case_parts.append(f"WHEN {x_field} = {x_scale[-1]} THEN {len(x_scale)-2}")
-            x_case = f"CASE {' '.join(x_case_parts)} END"
-            
-            query = f"""
-            SELECT 
-                {x_case} as x_bin,
-                {y_field} as y,
-                {value_expr} as value
-            FROM {table_name}
-            WHERE ({x_field} IS NOT NULL) AND ({y_field} IS NOT NULL)
-            GROUP BY x_bin, {y_field}
-            HAVING x_bin IS NOT NULL
-            """
-            
-        elif not x_is_numeric and y_is_numeric:
-            # X categorical, Y numeric
-            y_scale = create_numeric_scale(y_min_num, y_max_num, height or 15)
-            
-            y_case_parts = []
-            for i in range(len(y_scale) - 1):
-                y_case_parts.append(
-                    f"WHEN {y_field} >= {y_scale[i]} AND {y_field} < {y_scale[i+1]} THEN {i}"
-                )
-            y_case_parts.append(f"WHEN {y_field} = {y_scale[-1]} THEN {len(y_scale)-2}")
-            y_case = f"CASE {' '.join(y_case_parts)} END"
-            
-            query = f"""
-            SELECT 
-                {x_field} as x,
-                {y_case} as y_bin,
-                {value_expr} as value
-            FROM {table_name}
-            WHERE ({x_field} IS NOT NULL) AND ({y_field} IS NOT NULL)
-            GROUP BY {x_field}, y_bin
-            HAVING y_bin IS NOT NULL
-            """
-            
+        # Build the SELECT and GROUP BY clauses based on axis types
+        select_parts = []
+        group_by_parts = []
+        having_parts = []
+        
+        # Handle X axis
+        if x_is_numeric:
+            x_expr_only = x_expr.replace(" as x", "")
+            select_parts.append(f"{x_expr_only} as x_bin")
+            group_by_parts.append("x_bin")
+            having_parts.append("x_bin IS NOT NULL")
         else:
-            # Both categorical - simple grouping
-            query = f"""
-            SELECT 
-                {x_field} as x,
-                {y_field} as y,
-                {value_expr} as value
-            FROM {table_name}
-            WHERE ({x_field} IS NOT NULL) AND ({y_field} IS NOT NULL)
-            GROUP BY {x_field}, {y_field}
-            """
+            select_parts.append(x_expr)
+            group_by_parts.append(x_field)
+        
+        # Handle Y axis
+        if y_is_numeric:
+            y_expr_only = y_expr.replace(" as y", "")
+            select_parts.append(f"{y_expr_only} as y_bin")
+            group_by_parts.append("y_bin")
+            having_parts.append("y_bin IS NOT NULL")
+        else:
+            select_parts.append(y_expr)
+            group_by_parts.append(y_field)
+        
+        # Add value expression
+        select_parts.append(f"{value_expr} as value")
+        
+        # Build the complete query
+        query = f"""
+        SELECT 
+            {', '.join(select_parts)}
+        FROM {table_name}
+        WHERE ({x_field} IS NOT NULL) AND ({y_field} IS NOT NULL)
+        GROUP BY {', '.join(group_by_parts)}
+        """
+        
+        if having_parts:
+            query += f"\nHAVING {' AND '.join(having_parts)}"
         
         if verbose:
             print(f"Generated query: {query}", file=sys.stderr)
@@ -237,15 +220,13 @@ def create_heatmap_with_proper_aggregation(
         if not results:
             return None
         
-        # Now we need to transform the results for the heatmap
-        # For binned axes, we need to reconstruct the actual values
+        # Transform the results for the heatmap
         transformed_data = []
         
         for row in results:
             if x_is_numeric and y_is_numeric:
                 x_bin, y_bin, value = row
                 if x_bin is not None and y_bin is not None:
-                    # Use the bin index as a proxy for the value
                     x_val = x_scale[x_bin]
                     y_val = y_scale[y_bin]
                     transformed_data.append((x_val, y_val, value))

@@ -10,7 +10,6 @@ from .core import (
 )
 from .query_builder import (
     parse_aggregation,
-    build_heatmap_query,
     parse_chart_command,
 )
 
@@ -22,6 +21,5 @@ __all__ = [
     "execute_query",
     "format_output",
     "parse_aggregation",
-    "build_heatmap_query",
     "parse_chart_command",
 ]

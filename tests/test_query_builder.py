@@ -1,5 +1,5 @@
 import pytest
-from uplt.query_builder import parse_aggregation, build_heatmap_query, parse_chart_command
+from uplt.query_builder import parse_aggregation, parse_chart_command
 
 
 class TestParseAggregation:
@@ -48,51 +48,6 @@ class TestParseAggregation:
         func, field = parse_aggregation("avg(sum(price))")
         assert func == "avg"
         assert field == "sum(price)"
-
-
-class TestBuildHeatmapQuery:
-    def test_basic_heatmap_no_value(self):
-        query = build_heatmap_query("department", "age")
-        expected = """SELECT 
-        department as x,
-        age as y,
-        COUNT(*) as value
-    FROM data
-    GROUP BY department, age
-    ORDER BY age, department"""
-        assert query == expected
-    
-    def test_heatmap_with_aggregation(self):
-        query = build_heatmap_query("department", "age", "avg(salary)")
-        expected = """SELECT 
-        department as x,
-        age as y,
-        AVG(salary) as value
-    FROM data
-    GROUP BY department, age
-    ORDER BY age, department"""
-        assert query == expected
-    
-    def test_heatmap_with_plain_field(self):
-        query = build_heatmap_query("department", "age", "salary")
-        expected = """SELECT 
-        department as x,
-        age as y,
-        salary as value
-    FROM data
-    GROUP BY department, age
-    ORDER BY age, department"""
-        assert query == expected
-    
-    def test_custom_table_name(self):
-        query = build_heatmap_query("x_col", "y_col", table_name="custom_table")
-        assert "FROM custom_table" in query
-    
-    def test_field_name_stripping(self):
-        query = build_heatmap_query("  department  ", "  age  ", "  avg(salary)  ")
-        assert "department as x" in query
-        assert "age as y" in query
-        assert "AVG(salary) as value" in query
 
 
 class TestParseChartCommand:

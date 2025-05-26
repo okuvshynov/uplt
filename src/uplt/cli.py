@@ -12,7 +12,9 @@ def main():
                '  SQL query: cat data.csv | uplt query "SELECT * FROM data"\n'
                '  SQL query (short): cat data.csv | uplt q "SELECT * FROM data"\n'
                '  Heatmap: cat data.csv | uplt heatmap x_field y_field "avg(value)"\n'
-               '  Heatmap (short): cat data.csv | uplt hm x_field y_field "avg(value)"\n',
+               '  Heatmap (short): cat data.csv | uplt hm x_field y_field "avg(value)"\n'
+               '  Comparison: cat data.csv | uplt comparison versions metrics "avg(value)"\n'
+               '  Comparison (short): cat data.csv | uplt cmp versions metrics "avg(value)"\n',
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     
@@ -83,7 +85,8 @@ def main():
         # Map short versions to full commands
         command_aliases = {
             'q': 'query',
-            'hm': 'heatmap'
+            'hm': 'heatmap',
+            'cmp': 'comparison'
         }
         command_type = command_aliases.get(command_type, command_type)
         
@@ -106,7 +109,9 @@ def main():
         else:
             # Chart mode
             try:
-                chart_type, options = parse_chart_command(args.command)
+                # Create modified command list with mapped chart type
+                mapped_command = [command_type] + args.command[1:]
+                chart_type, options = parse_chart_command(mapped_command)
                 
                 # Build appropriate query based on chart type
                 if chart_type == "heatmap":
@@ -126,6 +131,23 @@ def main():
                         print(chart)
                     else:
                         print("No data to plot.", file=sys.stderr)
+                elif chart_type == "comparison":
+                    # Import here to avoid circular dependency
+                    from .charts import create_comparison
+                    
+                    chart = create_comparison(
+                        cursor,
+                        options["versions_field"],
+                        options["metrics_field"],
+                        options["value_field"],
+                        args.table_name,
+                        verbose=args.verbose
+                    )
+                    
+                    if chart:
+                        print(chart)
+                    else:
+                        print("No data to compare.", file=sys.stderr)
                 else:
                     print(f"Chart type '{chart_type}' not yet implemented", file=sys.stderr)
                     sys.exit(1)

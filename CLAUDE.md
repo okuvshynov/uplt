@@ -123,21 +123,26 @@ cat data/comparison_test.csv | uplt -v cmp model_id input_size score
 
 ### Comparison Visualization
 - **Purpose**: Compares values between two versions/variants across multiple metrics
-- **Layout**: Table format showing:
-  - First column: metric names
-  - Second column: values from version A
-  - Third column: values from version B
-  - Fourth column: difference (absolute and percentage)
+- **Layout**: 
+  - Version labels shown at the top (A: version_name, B: version_name)
+  - Table format with A/B column headers for compactness:
+    - First column: metric names
+    - Second column: values from version A
+    - Third column: values from version B
+    - Fourth column: difference (absolute and percentage)
 - **Usage**:
   - `versions_field`: Field containing version identifiers (typically 2 distinct values)
   - `metrics_field`: Field containing metric names (rows in the output)
   - `value_field`: Optional field to aggregate (defaults to COUNT if not specified)
 - **Features**:
+  - Compact display with A/B labels to fit in 80-character terminals
   - Automatic percentage calculation
   - Handles missing values (defaults to 0)
   - Supports all aggregation functions: avg(), sum(), min(), max(), count()
   - Verbose mode shows generated SQL and all data points
+  - When more than 2 groups exist, compares first 2 alphabetically (with warning in verbose mode)
 - **Difference Calculation**: B - A, with percentage relative to A
+- **Multiple Groups**: For datasets with >2 groups, use filtering (grep, SQL query) to select exactly 2 groups for comparison
 
 ### CSV Handling
 - **Automatic Header Detection**: By default, uplt automatically detects whether the first row contains headers

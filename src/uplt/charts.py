@@ -554,6 +554,11 @@ def create_comparison(
         # Build the comparison table
         lines = []
         
+        # Add version labels at the top
+        lines.append(f"A: {version_a}")
+        lines.append(f"B: {version_b}")
+        lines.append("")
+        
         # Calculate column widths
         metric_width = max(len(str(metric)) for metric in metric_data.keys())
         metric_width = max(metric_width, 7)  # Minimum width for header
@@ -570,9 +575,10 @@ def create_comparison(
         a_width = max(len(f"{val:.6g}" if isinstance(val, (int, float)) else str(val)) for val in a_values) if a_values else 8
         b_width = max(len(f"{val:.6g}" if isinstance(val, (int, float)) else str(val)) for val in b_values) if b_values else 8
         
-        # Account for headers
-        a_header = f"{version_a} {value_field if value_field else 'count'}"
-        b_header = f"{version_b} {value_field if value_field else 'count'}"
+        # Use shorter headers with just A/B
+        value_suffix = f" {value_field}" if value_field else " count"
+        a_header = f"A{value_suffix}"
+        b_header = f"B{value_suffix}"
         a_width = max(a_width, len(a_header))
         b_width = max(b_width, len(b_header))
         

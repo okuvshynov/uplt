@@ -1,0 +1,13 @@
+model,test_case,latency,accuracy,throughput
+ModelA,small_input,45,0.92,1200
+ModelA,medium_input,78,0.94,850
+ModelA,large_input,125,0.95,520
+ModelA,xlarge_input,210,0.96,310
+ModelB,small_input,38,0.89,1450
+ModelB,medium_input,65,0.91,1020
+ModelB,large_input,105,0.93,640
+ModelB,xlarge_input,175,0.94,380
+ModelC,small_input,52,0.94,1050
+ModelC,medium_input,85,0.95,780
+ModelC,large_input,140,0.97,480
+ModelC,xlarge_input,230,0.98,290

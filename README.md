@@ -109,6 +109,9 @@ cat data/comparison_test.csv | uplt cmp model_id category
 
 Output format:
 ```
+A: model_a_name
+B: model_b_name
+
         | A score | B score | diff
 --------+---------+---------+----------------
 128     | 10      | 15      | +5 (+50.0%)
@@ -117,6 +120,8 @@ Output format:
 ```
 
 The comparison chart:
+- Shows version/model names at the top to avoid long column headers
+- Uses A/B labels in the table for compact display
 - Compares values between exactly 2 versions/variants
 - Shows absolute and percentage differences
 - Calculates difference as: B - A

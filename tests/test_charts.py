@@ -159,6 +159,10 @@ class TestComparison:
         )
         
         assert result is not None
+        # Check version labels
+        assert "A: A" in result
+        assert "B: B" in result
+        
         # Check header
         assert "A score" in result
         assert "B score" in result
@@ -242,6 +246,8 @@ class TestComparison:
         )
         
         assert result is not None
+        assert "A: v1" in result
+        assert "B: v2" in result
         assert "small" in result
         assert "medium" in result
         assert "large" in result

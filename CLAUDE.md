@@ -140,7 +140,9 @@ cat data/comparison_test.csv | uplt -v cmp model_id input_size score
   - Handles missing values (defaults to 0)
   - Supports all aggregation functions: avg(), sum(), min(), max(), count()
   - Verbose mode shows generated SQL and all data points
+  - When more than 2 groups exist, compares first 2 alphabetically (with warning in verbose mode)
 - **Difference Calculation**: B - A, with percentage relative to A
+- **Multiple Groups**: For datasets with >2 groups, use filtering (grep, SQL query) to select exactly 2 groups for comparison
 
 ### CSV Handling
 - **Automatic Header Detection**: By default, uplt automatically detects whether the first row contains headers

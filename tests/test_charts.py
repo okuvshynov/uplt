@@ -299,3 +299,24 @@ class TestComparison:
         )
         
         assert result == "No versions found"
+    
+    def test_comparison_multiple_versions(self):
+        """Test comparison with more than 2 versions (should use first 2)."""
+        # Add a third model
+        self.cursor.execute("INSERT INTO test_data VALUES ('C', 128, 15, 20)")
+        self.cursor.execute("INSERT INTO test_data VALUES ('C', 256, 30, 25)")
+        self.cursor.execute("INSERT INTO test_data VALUES ('C', 512, 60, 18)")
+        
+        result = create_comparison(
+            self.cursor, "model_id", "input_size", "score", "test_data"
+        )
+        
+        assert result is not None
+        # Should compare A and B (first two alphabetically)
+        assert "A: A" in result
+        assert "B: B" in result
+        assert "C:" not in result  # C should not appear
+        
+        # Check it still shows correct values for A and B
+        assert "10" in result  # A's score for 128
+        assert "15" in result  # B's score for 128

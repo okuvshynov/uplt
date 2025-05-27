@@ -14,7 +14,9 @@ def main():
                '  Heatmap: cat data.csv | uplt heatmap x_field y_field "avg(value)"\n'
                '  Heatmap (short): cat data.csv | uplt hm x_field y_field "avg(value)"\n'
                '  Comparison: cat data.csv | uplt comparison versions metrics "avg(value)"\n'
-               '  Comparison (short): cat data.csv | uplt cmp versions metrics "avg(value)"\n',
+               '  Comparison (short): cat data.csv | uplt cmp versions metrics "avg(value)"\n'
+               '  Multi-comparison: cat data.csv | uplt multi-comparison models metrics "avg(value)"\n'
+               '  Multi-comparison (short): cat data.csv | uplt mcmp models metrics "avg(value)"\n',
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     
@@ -86,7 +88,8 @@ def main():
         command_aliases = {
             'q': 'query',
             'hm': 'heatmap',
-            'cmp': 'comparison'
+            'cmp': 'comparison',
+            'mcmp': 'multi-comparison'
         }
         command_type = command_aliases.get(command_type, command_type)
         
@@ -136,6 +139,23 @@ def main():
                     from .charts import create_comparison
                     
                     chart = create_comparison(
+                        cursor,
+                        options["versions_field"],
+                        options["metrics_field"],
+                        options["value_field"],
+                        args.table_name,
+                        verbose=args.verbose
+                    )
+                    
+                    if chart:
+                        print(chart)
+                    else:
+                        print("No data to compare.", file=sys.stderr)
+                elif chart_type == "multi-comparison":
+                    # Import here to avoid circular dependency
+                    from .charts import create_multi_comparison
+                    
+                    chart = create_multi_comparison(
                         cursor,
                         options["versions_field"],
                         options["metrics_field"],

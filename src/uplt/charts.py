@@ -763,27 +763,57 @@ def create_multi_comparison(
         baseline_header = "A"
         baseline_width = max(baseline_width, len(baseline_header))
         
-        # Calculate widths for comparison versions
+        # Calculate widths for comparison versions and diff columns
         version_widths = {}
+        diff_widths = {}
+        
         for version in comparison_versions:
             version_values = []
+            diff_strings = []
+            
             for metric in metric_data.values():
                 if version in metric:
                     version_values.append(metric[version])
+                    
+                    # Calculate diff string to determine width
+                    baseline_val = metric.get(baseline_version, 0)
+                    comp_val = metric.get(version, 0)
+                    
+                    try:
+                        baseline_num = float(baseline_val)
+                        comp_num = float(comp_val)
+                        diff = comp_num - baseline_num
+                        
+                        if baseline_num != 0:
+                            pct_diff = (diff / baseline_num) * 100
+                            diff_str = f"{diff:+.6g} ({pct_diff:+.1f}%)"
+                        else:
+                            if diff == 0:
+                                diff_str = "0"
+                            else:
+                                diff_str = f"{diff:+.6g} (inf%)"
+                    except (ValueError, TypeError):
+                        diff_str = "N/A"
+                    
+                    diff_strings.append(diff_str)
             
             val_width = max(len(f"{val:.6g}" if isinstance(val, (int, float)) else str(val)) for val in version_values) if version_values else 8
             # Use letter labels
             version_header = version_labels[version]
             val_width = max(val_width, len(version_header))
             version_widths[version] = (val_width, version_header)
-        
-        diff_width = 15  # For diff columns
+            
+            # Calculate actual diff width needed
+            diff_width = max(len(s) for s in diff_strings) if diff_strings else 15
+            diff_width = max(diff_width, 4)  # Minimum width for "diff" header
+            diff_widths[version] = diff_width
         
         # Build header
         header_parts = [" " * metric_width, baseline_header.ljust(baseline_width)]
         
         for version in comparison_versions:
             width, letter_label = version_widths[version]
+            diff_width = diff_widths[version]
             header_parts.extend([letter_label.ljust(width), "diff".ljust(diff_width)])
         
         header = " | ".join(header_parts)
@@ -793,6 +823,7 @@ def create_multi_comparison(
         sep_parts = ["-" * metric_width, "-" * baseline_width]
         for version in comparison_versions:
             width, _ = version_widths[version]
+            diff_width = diff_widths[version]
             sep_parts.extend(["-" * width, "-" * diff_width])
         
         separator = "-+-".join(sep_parts)
@@ -833,6 +864,7 @@ def create_multi_comparison(
                     diff_str = "N/A"
                 
                 width, _ = version_widths[version]
+                diff_width = diff_widths[version]
                 row_parts.extend([comp_str.ljust(width), diff_str.ljust(diff_width)])
             
             row = " | ".join(row_parts)

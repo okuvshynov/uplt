@@ -737,8 +737,16 @@ def create_multi_comparison(
         # Build the multi-comparison table
         lines = []
         
-        # Add baseline label at the top
-        lines.append(f"Baseline: {baseline_version}")
+        # Add version labels at the top
+        lines.append(f"Baseline (A): {baseline_version}")
+        
+        # Create letter labels for comparison versions
+        version_labels = {}
+        for i, version in enumerate(comparison_versions):
+            label = chr(ord('B') + i)  # B, C, D, ...
+            version_labels[version] = label
+            lines.append(f"{label}: {version}")
+        
         lines.append("")
         
         # Calculate column widths
@@ -752,7 +760,7 @@ def create_multi_comparison(
                 baseline_values.append(metric[baseline_version])
         
         baseline_width = max(len(f"{val:.6g}" if isinstance(val, (int, float)) else str(val)) for val in baseline_values) if baseline_values else 8
-        baseline_header = "Baseline"
+        baseline_header = "A"
         baseline_width = max(baseline_width, len(baseline_header))
         
         # Calculate widths for comparison versions
@@ -764,8 +772,8 @@ def create_multi_comparison(
                     version_values.append(metric[version])
             
             val_width = max(len(f"{val:.6g}" if isinstance(val, (int, float)) else str(val)) for val in version_values) if version_values else 8
-            # Truncate long version names for column headers
-            version_header = version if len(version) <= 12 else version[:9] + "..."
+            # Use letter labels
+            version_header = version_labels[version]
             val_width = max(val_width, len(version_header))
             version_widths[version] = (val_width, version_header)
         
@@ -775,8 +783,8 @@ def create_multi_comparison(
         header_parts = [" " * metric_width, baseline_header.ljust(baseline_width)]
         
         for version in comparison_versions:
-            width, short_name = version_widths[version]
-            header_parts.extend([short_name.ljust(width), "diff".ljust(diff_width)])
+            width, letter_label = version_widths[version]
+            header_parts.extend([letter_label.ljust(width), "diff".ljust(diff_width)])
         
         header = " | ".join(header_parts)
         lines.append(header)
@@ -829,14 +837,6 @@ def create_multi_comparison(
             
             row = " | ".join(row_parts)
             lines.append(row)
-        
-        # Add legend for truncated version names if any
-        truncated = [(v, version_widths[v][1]) for v in comparison_versions if len(v) > 12]
-        if truncated:
-            lines.append("")
-            lines.append("Version names:")
-            for full_name, short_name in truncated:
-                lines.append(f"  {short_name} = {full_name}")
         
         return "\n".join(lines)
         

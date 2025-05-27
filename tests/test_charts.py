@@ -1,9 +1,11 @@
 import pytest
 import sqlite3
-from uplt.charts import (
+from uplt.charts.utils import (
     is_numeric_axis, 
     create_numeric_scale, 
-    find_bin_index,
+    find_bin_index
+)
+from uplt.charts import (
     create_heatmap,
     create_comparison
 )

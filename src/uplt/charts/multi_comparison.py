@@ -1,8 +1,26 @@
 """Multi-comparison chart implementation."""
 import sqlite3
 import sys
-from typing import Optional
+from typing import Optional, List
 from .display_mode import DisplayMode
+
+
+def should_use_original_names(names: List[str], max_length: int = 8) -> bool:
+    """
+    Determine if original names should be used instead of letter labels.
+    
+    Args:
+        names: List of version/model names
+        max_length: Maximum acceptable length for any name (shorter for multi-comparison)
+    
+    Returns:
+        True if all names are short enough to use directly
+    """
+    if not names:
+        return False
+    
+    # Check if all names are short enough
+    return all(len(str(name)) <= max_length for name in names)
 
 
 def create_multi_comparison(
@@ -128,17 +146,27 @@ def create_multi_comparison(
         # Build the multi-comparison table
         lines = []
         
-        # Add version labels at the top
-        lines.append(f"Baseline (A): {baseline_version}")
+        # Determine whether to use original names or letter labels
+        all_versions = [baseline_version] + comparison_versions
+        use_original = should_use_original_names(all_versions)
         
-        # Create letter labels for comparison versions
-        version_labels = {}
-        for i, version in enumerate(comparison_versions):
-            label = chr(ord('B') + i)  # B, C, D, ...
-            version_labels[version] = label
-            lines.append(f"{label}: {version}")
-        
-        lines.append("")
+        if use_original:
+            # Use original names directly
+            baseline_label = str(baseline_version)
+            version_labels = {v: str(v) for v in comparison_versions}
+        else:
+            # Use letter labels with legend
+            baseline_label = "A"
+            lines.append(f"Baseline (A): {baseline_version}")
+            
+            # Create letter labels for comparison versions
+            version_labels = {}
+            for i, version in enumerate(comparison_versions):
+                label = chr(ord('B') + i)  # B, C, D, ...
+                version_labels[version] = label
+                lines.append(f"{label}: {version}")
+            
+            lines.append("")
         
         # Calculate column widths
         metric_width = max(len(str(metric)) for metric in metric_data.keys())
@@ -151,7 +179,7 @@ def create_multi_comparison(
                 baseline_values.append(metric[baseline_version])
         
         baseline_width = max(len(f"{val:.6g}" if isinstance(val, (int, float)) else str(val)) for val in baseline_values) if baseline_values else 8
-        baseline_header = "A"
+        baseline_header = baseline_label
         baseline_width = max(baseline_width, len(baseline_header))
         
         # Calculate widths and formatted values for comparison versions

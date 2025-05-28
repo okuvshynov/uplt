@@ -1,8 +1,26 @@
 """Comparison chart implementation."""
 import sqlite3
 import sys
-from typing import Optional
+from typing import Optional, List
 from .display_mode import DisplayMode
+
+
+def should_use_original_names(names: List[str], max_length: int = 10) -> bool:
+    """
+    Determine if original names should be used instead of letter labels.
+    
+    Args:
+        names: List of version/model names
+        max_length: Maximum acceptable length for any name
+    
+    Returns:
+        True if all names are short enough to use directly
+    """
+    if not names:
+        return False
+    
+    # Check if all names are short enough
+    return all(len(str(name)) <= max_length for name in names)
 
 
 def create_comparison(
@@ -120,10 +138,20 @@ def create_comparison(
         # Build the comparison table
         lines = []
         
-        # Add version labels at the top
-        lines.append(f"A: {version_a}")
-        lines.append(f"B: {version_b}")
-        lines.append("")
+        # Determine whether to use original names or letter labels
+        use_original = should_use_original_names([version_a, version_b])
+        
+        if use_original:
+            # Use original names directly
+            label_a = str(version_a)
+            label_b = str(version_b)
+        else:
+            # Use letter labels with legend
+            label_a = "A"
+            label_b = "B"
+            lines.append(f"A: {version_a}")
+            lines.append(f"B: {version_b}")
+            lines.append("")
         
         # Calculate column widths
         metric_width = max(len(str(metric)) for metric in metric_data.keys())
@@ -184,10 +212,16 @@ def create_comparison(
         a_width = max(len(f"{val:.6g}" if isinstance(val, (int, float)) else str(val)) for val in a_values) if a_values else 8
         b_width = max(len(val) for val in b_formatted_values) if b_formatted_values else 8
         
-        # Use shorter headers with just A/B
+        # Use appropriate headers based on whether we're using original names
         value_suffix = f" {value_field}" if value_field else " count"
-        a_header = f"A{value_suffix}"
-        b_header = f"B{value_suffix}"
+        if use_original:
+            # Use original names in headers when they're short
+            a_header = f"{label_a}{value_suffix}"
+            b_header = f"{label_b}{value_suffix}"
+        else:
+            # Use letter labels for long names
+            a_header = f"A{value_suffix}"
+            b_header = f"B{value_suffix}"
         a_width = max(a_width, len(a_header))
         b_width = max(b_width, len(b_header))
         

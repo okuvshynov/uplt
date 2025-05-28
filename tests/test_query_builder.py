@@ -134,7 +134,7 @@ class TestParseChartCommand:
     
     def test_comparison_minimal(self):
         chart_type, options = parse_chart_command(["comparison", "versions", "metrics"])
-        assert chart_type == "comparison"
+        assert chart_type == "multi-comparison"  # comparison now maps to multi-comparison
         assert options == {
             "versions_field": "versions",
             "metrics_field": "metrics",
@@ -143,7 +143,7 @@ class TestParseChartCommand:
     
     def test_comparison_with_value(self):
         chart_type, options = parse_chart_command(["comparison", "model_id", "input_size", "score"])
-        assert chart_type == "comparison"
+        assert chart_type == "multi-comparison"  # comparison now maps to multi-comparison
         assert options == {
             "versions_field": "model_id",
             "metrics_field": "input_size",
@@ -152,7 +152,7 @@ class TestParseChartCommand:
     
     def test_comparison_with_aggregation(self):
         chart_type, options = parse_chart_command(["comparison", "model", "size", "avg(latency)"])
-        assert chart_type == "comparison"
+        assert chart_type == "multi-comparison"  # comparison now maps to multi-comparison
         assert options == {
             "versions_field": "model",
             "metrics_field": "size",
@@ -160,10 +160,10 @@ class TestParseChartCommand:
         }
     
     def test_comparison_missing_fields(self):
-        with pytest.raises(ValueError, match="Comparison requires at least versions_field and metrics_field"):
+        with pytest.raises(ValueError, match="Multi-comparison requires at least versions_field and metrics_field"):
             parse_chart_command(["comparison"])
         
-        with pytest.raises(ValueError, match="Comparison requires at least versions_field and metrics_field"):
+        with pytest.raises(ValueError, match="Multi-comparison requires at least versions_field and metrics_field"):
             parse_chart_command(["comparison", "versions"])
     
     def test_heatmap_short_alias(self):
@@ -177,7 +177,7 @@ class TestParseChartCommand:
     
     def test_comparison_short_alias(self):
         chart_type, options = parse_chart_command(["cmp", "versions", "metrics", "value"])
-        assert chart_type == "comparison"
+        assert chart_type == "multi-comparison"  # cmp now maps to multi-comparison
         assert options == {
             "versions_field": "versions",
             "metrics_field": "metrics",

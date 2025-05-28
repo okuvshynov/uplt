@@ -1,4 +1,9 @@
-"""Comparison chart implementation."""
+"""Comparison chart implementation.
+
+DEPRECATED: This module is deprecated. Use multi_comparison.py instead.
+The comparison functionality has been unified with multi-comparison,
+which now handles both 2-version and multi-version comparisons.
+"""
 import sqlite3
 import sys
 from typing import Optional, List

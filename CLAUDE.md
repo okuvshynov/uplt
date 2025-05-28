@@ -89,6 +89,33 @@ cat data.csv | uplt cmp model "CASE WHEN latency < 100 THEN 'fast' ELSE 'slow' E
 cat data.csv | uplt hm "UPPER(substr(product_code, 1, 3))" month "sum(sales)"
 ```
 
+### Add Column Mode
+```bash
+# Add calculated columns
+cat data.csv | uplt add "price * quantity as total"
+# Short form
+cat data.csv | uplt a "price * 0.1 as tax"
+
+# Conditional columns
+cat data.csv | uplt add "case when price > 100 then 'expensive' else 'cheap' end as category"
+cat data.csv | uplt add "if(status = 'active', 1, 0) as is_active"
+
+# Using SQLite functions
+cat data.csv | uplt add "lower(name) as name_lower"
+cat data.csv | uplt add "substr(date, 1, 7) as month"
+cat data.csv | uplt add "round(price, 2) as price_rounded"
+
+# Chaining with other commands
+cat latency.csv | uplt add "if(n_items > 1000, 1, 0) as large_query" | uplt cmp version large_query latency_ms
+
+# Complex pipelines
+cat sales.csv | \
+  uplt add "quantity * unit_price as total" | \
+  uplt add "total * 0.08 as tax" | \
+  uplt add "total + tax as grand_total" | \
+  uplt query "SELECT category, SUM(grand_total) FROM data GROUP BY category"
+```
+
 ### Chart Mode (Heatmap)
 ```bash
 # Count occurrences
@@ -257,6 +284,7 @@ cat data.csv | uplt -v mcmp models metrics value
 - Consolidated chart rendering logic
 
 ### Feature Improvements
+- **New add command**: Add computed columns to CSV data with `add` or `a` command for easy data transformation and piping
 - **Unified comparison mode**: Both `cmp` and `mcmp` now use multi-comparison, supporting any number of versions (2+)
 - **Deprecated comparison chart**: The separate comparison mode has been deprecated in favor of unified multi-comparison
 - **Short command aliases**: Use `q` for `query`, `hm` for `heatmap`, `cmp` for `comparison`, and `mcmp` for `multi-comparison`

@@ -16,9 +16,10 @@ uv pip install uplt
 
 ## Usage
 
-uplt supports two modes:
+uplt supports three modes:
 1. **SQL Query Mode**: Execute raw SQL queries on CSV data
-2. **Chart Mode**: Create terminal-based charts from CSV data (heatmaps, comparisons)
+2. **Add Column Mode**: Add computed columns to CSV data for piping
+3. **Chart Mode**: Create terminal-based charts from CSV data (heatmaps, comparisons)
 
 ### SQL Query Mode
 
@@ -26,6 +27,24 @@ Pipe CSV data to `uplt` with the `query` command:
 
 ```bash
 cat data.csv | uplt query "SELECT foo, bar, SUM(baz) FROM data GROUP BY foo, bar"
+```
+
+### Add Column Mode
+
+Add computed columns to your CSV data:
+
+```bash
+# Add a calculated column
+cat data.csv | uplt add "price * quantity as total"
+
+# Add a conditional column
+cat data.csv | uplt add "case when price > 100 then 'expensive' else 'cheap' end as category"
+
+# Use SQLite functions
+cat data.csv | uplt add "lower(name) as name_lower"
+
+# Chain with other commands
+cat latency.csv | uplt add "if(n_items > 1000, 1, 0) as large_query" | uplt cmp version large_query latency_ms
 ```
 
 ### Chart Mode
@@ -72,6 +91,38 @@ echo -e "1,100,200\n2,150,300\n3,200,400" | uplt query "SELECT f1, f2+f3 as tota
 
 # Or explicitly specify no headers
 cat no_headers.csv | uplt --no-header query "SELECT f1, f2 FROM data WHERE f3 > 100"
+```
+
+### Adding Columns
+
+#### Simple calculations
+```bash
+# Add a total column
+cat sales.csv | uplt add "price * quantity as total"
+
+# Add multiple columns by chaining
+cat sales.csv | uplt add "price * quantity as total" | uplt add "total * 0.1 as tax"
+```
+
+#### Conditional columns
+```bash
+# Categorize based on conditions
+cat products.csv | uplt add "case when price > 100 then 'premium' else 'budget' end as tier"
+
+# Binary flags
+cat logs.csv | uplt add "if(response_time > 1000, 1, 0) as slow_request"
+```
+
+#### Data transformation pipelines
+```bash
+# Transform data then create charts
+cat performance.csv | uplt add "if(cpu_usage > 80, 'high', 'normal') as load" | uplt cmp server load avg_response_time
+
+# Complex multi-step analysis
+cat orders.csv | \
+  uplt add "quantity * unit_price as order_total" | \
+  uplt add "case when order_total > 1000 then 'large' else 'small' end as order_size" | \
+  uplt cmp region order_size "sum(order_total)"
 ```
 
 #### Using SQLite functions in field arguments
@@ -195,6 +246,7 @@ By default, uplt automatically detects whether the first row contains headers by
 
 For convenience, uplt provides short aliases for common commands:
 - `q` → `query`
+- `a` → `add`
 - `hm` → `heatmap`
 - `cmp` → `mcmp` (comparison, works with 2+ versions)
 - `mcmp` → `multi-comparison` (explicit multi-comparison command)
@@ -202,6 +254,7 @@ For convenience, uplt provides short aliases for common commands:
 Example:
 ```bash
 cat data.csv | uplt q "SELECT * FROM data"
+cat data.csv | uplt a "price * 0.1 as tax"
 cat data.csv | uplt hm x_field y_field
 cat data.csv | uplt cmp version metric value  # Works with any number of versions
 ```

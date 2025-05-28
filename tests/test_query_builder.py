@@ -48,6 +48,54 @@ class TestParseAggregation:
         func, field = parse_aggregation("avg(sum(price))")
         assert func == "avg"
         assert field == "sum(price)"
+    
+    def test_sqlite_string_functions(self):
+        # String functions should not be parsed as aggregations
+        func, field = parse_aggregation("upper(name)")
+        assert func is None
+        assert field == "upper(name)"
+        
+        func, field = parse_aggregation("lower(name)")
+        assert func is None
+        assert field == "lower(name)"
+        
+        func, field = parse_aggregation("substr(name, 1, 3)")
+        assert func is None
+        assert field == "substr(name, 1, 3)"
+    
+    def test_sqlite_numeric_functions(self):
+        # Numeric functions should not be parsed as aggregations
+        func, field = parse_aggregation("abs(value)")
+        assert func is None
+        assert field == "abs(value)"
+        
+        func, field = parse_aggregation("round(price, 2)")
+        assert func is None
+        assert field == "round(price, 2)"
+    
+    def test_aggregation_with_sqlite_function(self):
+        # Aggregation of SQLite function results
+        func, field = parse_aggregation("avg(abs(value))")
+        assert func == "avg"
+        assert field == "abs(value)"
+        
+        func, field = parse_aggregation("sum(round(price, 2))")
+        assert func == "sum"
+        assert field == "round(price, 2)"
+        
+        func, field = parse_aggregation("max(length(name))")
+        assert func == "max"
+        assert field == "length(name)"
+    
+    def test_complex_sqlite_expressions(self):
+        # Complex expressions inside aggregations
+        func, field = parse_aggregation("avg(price * quantity)")
+        assert func == "avg"
+        assert field == "price * quantity"
+        
+        func, field = parse_aggregation("sum(CASE WHEN status = 'active' THEN 1 ELSE 0 END)")
+        assert func == "sum"
+        assert field == "CASE WHEN status = 'active' THEN 1 ELSE 0 END"
 
 
 class TestParseChartCommand:

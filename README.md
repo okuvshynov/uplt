@@ -71,6 +71,27 @@ echo -e "1,100,200\n2,150,300\n3,200,400" | uplt query "SELECT f1, f2+f3 as tota
 cat no_headers.csv | uplt --no-header query "SELECT f1, f2 FROM data WHERE f3 > 100"
 ```
 
+#### Using SQLite functions in field arguments
+```bash
+# Extract substring from model names for grouping
+cat data/qwen30b3a_q2.csv | uplt mcmp "substr(model_filename, -15)" n_depth avg_ts
+
+# Normalize case for consistent grouping
+cat data.csv | uplt heatmap "UPPER(category)" month "sum(revenue)"
+
+# Group by string length
+cat data.csv | uplt comparison version "LENGTH(name)" "avg(score)"
+
+# Extract date parts
+cat logs.csv | uplt heatmap "substr(timestamp, 1, 10)" status "count(*)"
+
+# Use CASE expressions for custom grouping
+cat data.csv | uplt heatmap category "CASE WHEN price < 50 THEN 'low' ELSE 'high' END" "count(*)"
+
+# Combine multiple functions
+cat data.csv | uplt cmp "UPPER(substr(model, 1, 3))" metric value
+```
+
 ### Charts
 
 #### Basic heatmap (counts occurrences)
@@ -91,6 +112,7 @@ The heatmap uses Unicode block characters (░▒▓█) to show intensity. It a
 - Sparse numeric data is handled with interpolated bins
 - The legend shows exact value ranges for each character (e.g., '░': [10, 20))
 - For non-negative data, the scale starts at 0 to properly distinguish between no data (space) and small positive values
+- SQLite functions can be used in field arguments for dynamic grouping
 
 #### Comparison chart
 ```bash
@@ -223,6 +245,7 @@ cat data.csv | uplt mcmp models metrics value
 - Customizable display modes for comparison charts
 - Baseline selection for multi-comparison charts
 - Verbose mode for debugging with `-v` flag
+- **SQLite function support**: Use any SQLite function (substr, upper, lower, length, etc.) in field arguments for dynamic data transformation and grouping
 
 ## Development
 

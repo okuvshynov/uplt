@@ -278,6 +278,183 @@ class TestExecuteQuery:
             execute_query(self.cursor, "SELCT * FROM test")
 
 
+class TestSQLiteFunctions:
+    """Test SQLite function support in queries and field arguments."""
+    
+    def setup_method(self):
+        self.conn = sqlite3.connect(':memory:')
+        self.cursor = self.conn.cursor()
+        # Create test table with various data types
+        self.cursor.execute("""
+            CREATE TABLE products (
+                id INTEGER,
+                name TEXT,
+                category TEXT,
+                price REAL,
+                quantity INTEGER,
+                description TEXT,
+                created_date TEXT
+            )
+        """)
+        
+        # Insert test data
+        test_data = [
+            (1, 'laptop', 'electronics', 999.99, 10, 'High-end laptop', '2024-01-15'),
+            (2, 'MOUSE', 'electronics', 29.99, 50, 'Wireless mouse', '2024-01-20'),
+            (3, 'Desk Chair', 'furniture', 299.50, 15, 'Ergonomic office chair', '2024-02-01'),
+            (4, 'notebook', 'stationery', 5.99, 100, 'Spiral notebook', '2024-02-10'),
+            (5, 'MONITOR', 'electronics', 399.00, 25, 'LED monitor 27"', '2024-02-15'),
+            (6, 'desk lamp', 'furniture', 49.99, 30, 'Adjustable desk lamp', '2024-03-01'),
+            (7, 'keyboard', 'electronics', -89.99, 20, 'Mechanical keyboard', '2024-03-05'),  # negative price for abs() test
+        ]
+        
+        self.cursor.executemany(
+            "INSERT INTO products VALUES (?, ?, ?, ?, ?, ?, ?)",
+            test_data
+        )
+    
+    def teardown_method(self):
+        self.conn.close()
+    
+    def test_string_functions_upper_lower(self):
+        # Test UPPER function
+        results = execute_query(self.cursor, "SELECT name, UPPER(name) FROM products WHERE id = 2")
+        assert results[0] == ('MOUSE', 'MOUSE')
+        
+        # Test LOWER function
+        results = execute_query(self.cursor, "SELECT name, LOWER(name) FROM products WHERE id = 3")
+        assert results[0] == ('Desk Chair', 'desk chair')
+    
+    def test_string_function_substr(self):
+        # Test SUBSTR function
+        results = execute_query(self.cursor, "SELECT name, SUBSTR(name, 1, 4) FROM products WHERE id = 1")
+        assert results[0] == ('laptop', 'lapt')
+        
+        # Test SUBSTR with negative position
+        results = execute_query(self.cursor, "SELECT name, SUBSTR(name, -3) FROM products WHERE id = 4")
+        assert results[0] == ('notebook', 'ook')
+    
+    def test_string_function_length(self):
+        # Test LENGTH function
+        results = execute_query(self.cursor, "SELECT name, LENGTH(name) FROM products ORDER BY id LIMIT 3")
+        assert results[0] == ('laptop', 6)
+        assert results[1] == ('MOUSE', 5)
+        assert results[2] == ('Desk Chair', 10)
+    
+    def test_string_function_trim(self):
+        # Insert data with spaces
+        self.cursor.execute("INSERT INTO products VALUES (8, '  spaced  ', 'test', 10, 1, 'test', '2024-04-01')")
+        
+        # Test TRIM function
+        results = execute_query(self.cursor, "SELECT name, TRIM(name) FROM products WHERE id = 8")
+        assert results[0] == ('  spaced  ', 'spaced')
+    
+    def test_numeric_functions_abs_round(self):
+        # Test ABS function
+        results = execute_query(self.cursor, "SELECT price, ABS(price) FROM products WHERE id = 7")
+        assert results[0] == (-89.99, 89.99)
+        
+        # Test ROUND function
+        results = execute_query(self.cursor, "SELECT price, ROUND(price) FROM products WHERE id = 1")
+        assert results[0] == (999.99, 1000.0)
+        
+        # Test ROUND with precision
+        results = execute_query(self.cursor, "SELECT price, ROUND(price, 1) FROM products WHERE id = 3")
+        assert results[0] == (299.50, 299.5)
+    
+    def test_aggregate_with_string_functions(self):
+        # Test COUNT with UPPER
+        results = execute_query(self.cursor, 
+            "SELECT COUNT(DISTINCT UPPER(category)) FROM products")
+        assert results[0][0] == 3  # electronics, furniture, stationery
+        
+        # Test MAX with LENGTH
+        results = execute_query(self.cursor,
+            "SELECT MAX(LENGTH(name)) FROM products")
+        assert results[0][0] == 10  # 'Desk Chair' has length 10
+    
+    def test_aggregate_with_numeric_functions(self):
+        # Test SUM with ABS
+        results = execute_query(self.cursor,
+            "SELECT SUM(ABS(price)) FROM products WHERE category = 'electronics'")
+        # laptop: 999.99, mouse: 29.99, monitor: 399.00, keyboard: 89.99 (abs)
+        expected = 999.99 + 29.99 + 399.00 + 89.99
+        assert abs(results[0][0] - expected) < 0.01
+        
+        # Test AVG with ROUND
+        results = execute_query(self.cursor,
+            "SELECT AVG(ROUND(price)) FROM products WHERE category = 'furniture'")
+        # desk chair: 300, desk lamp: 50, avg = 175
+        assert results[0][0] == 175.0
+    
+    def test_case_expression(self):
+        # Test CASE expression
+        results = execute_query(self.cursor, """
+            SELECT name, 
+                   CASE 
+                       WHEN price < 50 THEN 'cheap'
+                       WHEN price < 300 THEN 'medium'
+                       ELSE 'expensive'
+                   END as price_category
+            FROM products
+            ORDER BY id
+            LIMIT 4
+        """)
+        assert results[0] == ('laptop', 'expensive')
+        assert results[1] == ('MOUSE', 'cheap')
+        assert results[2] == ('Desk Chair', 'medium')
+        assert results[3] == ('notebook', 'cheap')
+    
+    def test_complex_expressions(self):
+        # Test arithmetic operations
+        results = execute_query(self.cursor,
+            "SELECT name, price * quantity as total_value FROM products WHERE id = 1")
+        assert results[0] == ('laptop', 9999.9)
+        
+        # Test concatenation
+        results = execute_query(self.cursor,
+            "SELECT name || ' - ' || category as full_name FROM products WHERE id = 2")
+        assert results[0] == ('MOUSE - electronics',)
+    
+    def test_group_by_with_functions(self):
+        # Test GROUP BY with UPPER to normalize case
+        results = execute_query(self.cursor, """
+            SELECT UPPER(category) as cat, COUNT(*) as cnt, AVG(price) as avg_price
+            FROM products
+            GROUP BY UPPER(category)
+            ORDER BY cat
+        """)
+        assert len(results) == 3
+        assert results[0][0] == 'ELECTRONICS'  # normalized to uppercase
+        assert results[0][1] == 4  # count of electronics
+    
+    def test_where_clause_with_functions(self):
+        # Test WHERE with string function
+        results = execute_query(self.cursor,
+            "SELECT name FROM products WHERE LOWER(name) LIKE '%desk%'")
+        assert len(results) == 2
+        assert ('Desk Chair',) in results
+        assert ('desk lamp',) in results
+        
+        # Test WHERE with numeric function
+        results = execute_query(self.cursor,
+            "SELECT name FROM products WHERE ABS(price) > 100")
+        assert len(results) == 3  # laptop, desk chair, monitor
+    
+    def test_order_by_with_functions(self):
+        # Test ORDER BY with LENGTH
+        results = execute_query(self.cursor,
+            "SELECT name FROM products ORDER BY LENGTH(name) LIMIT 3")
+        assert results[0] == ('MOUSE',)  # length 5
+        assert results[1] == ('laptop',)  # length 6
+        
+        # Test ORDER BY with expression
+        results = execute_query(self.cursor,
+            "SELECT name, price * quantity as total FROM products ORDER BY price * quantity DESC LIMIT 2")
+        assert results[0][0] == 'laptop'  # highest total value
+        assert results[1][0] == 'MONITOR'  # second highest
+
+
 class TestFormatOutput:
     def test_basic_formatting(self):
         results = [(1, 'Alice'), (2, 'Bob')]

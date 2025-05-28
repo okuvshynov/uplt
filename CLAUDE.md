@@ -66,6 +66,30 @@ cat data.csv | uplt --no-header query "SELECT f1, f2 FROM data WHERE f3 > 100"
 cat data.csv | uplt -v query "SELECT * FROM data"
 ```
 
+### SQLite Functions in Field Arguments
+```bash
+# All chart commands support SQLite functions in field arguments
+# This allows dynamic data transformation and grouping
+
+# Extract substring from model names
+cat data/qwen30b3a_q2.csv | uplt mcmp "substr(model_filename, -15)" n_depth avg_ts -m compact
+
+# Normalize case for consistent grouping
+cat data.csv | uplt heatmap "UPPER(category)" "substr(date, 1, 7)" "sum(revenue)"
+
+# Group by string length
+cat data.csv | uplt comparison version "LENGTH(name)" "avg(score)"
+
+# Use arithmetic expressions
+cat data.csv | uplt heatmap category "price * quantity" "count(*)"
+
+# Complex CASE expressions
+cat data.csv | uplt cmp model "CASE WHEN latency < 100 THEN 'fast' ELSE 'slow' END" "avg(throughput)"
+
+# Nested functions
+cat data.csv | uplt hm "UPPER(substr(product_code, 1, 3))" month "sum(sales)"
+```
+
 ### Chart Mode (Heatmap)
 ```bash
 # Count occurrences
@@ -155,6 +179,14 @@ cat data.csv | uplt -v mcmp models metrics value
 - Parses aggregation functions: avg(), sum(), min(), max(), count()
 - Generates appropriate GROUP BY queries for charts
 - Sanitizes field names but doesn't fully prevent SQL injection (future improvement)
+- **SQLite Function Support**: Field arguments in charts can use any SQLite function:
+  - String functions: substr(), upper(), lower(), length(), trim(), replace()
+  - Date functions: date(), time(), strftime()
+  - Math functions: abs(), round(), min(), max()
+  - Conditional logic: CASE expressions
+  - Arithmetic expressions: field1 * field2, field1 + field2
+  - Function nesting: UPPER(substr(field, 1, 5))
+  - This enables dynamic data transformation without preprocessing CSV files
 
 ### Comparison Visualization
 - **Purpose**: Compares values between two versions/variants across multiple metrics
@@ -235,6 +267,7 @@ cat data.csv | uplt -v mcmp models metrics value
 - **Display modes for comparisons**: Customizable output format with `--display-mode` or `-m` flag
 - **Baseline selection**: Choose baseline for multi-comparison with `--baseline` or `-b` flag
 - **Simplified comparison layout**: Merged value and difference columns for more concise output
+- **SQLite function support**: Use any SQLite function in field arguments for dynamic data transformation
 
 ## Future Enhancements
 - Add more chart types (bar charts, line charts, scatter plots)

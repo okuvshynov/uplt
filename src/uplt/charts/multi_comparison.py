@@ -2,6 +2,7 @@
 import sqlite3
 import sys
 from typing import Optional
+from .display_mode import DisplayMode
 
 
 def create_multi_comparison(
@@ -10,11 +11,13 @@ def create_multi_comparison(
     metrics_field: str, 
     value_field: Optional[str],
     table_name: str,
-    verbose: bool = False
+    verbose: bool = False,
+    display_mode: str = 'value-percent',
+    baseline: Optional[str] = None
 ) -> Optional[str]:
     """
     Create a multi-comparison chart showing differences between multiple versions.
-    Uses the first version as baseline and compares all others to it.
+    Uses the first version as baseline (or specified baseline) and compares all others to it.
     
     Args:
         cursor: Database cursor
@@ -23,12 +26,22 @@ def create_multi_comparison(
         value_field: Optional field to aggregate (defaults to COUNT)
         table_name: Name of the table
         verbose: Whether to show additional debug info
+        display_mode: Display mode for difference formatting
+        baseline: Optional baseline version to compare against (defaults to first version)
     
     Returns:
         Formatted multi-comparison chart as string
     """
     from ..query_builder import parse_aggregation
     from ..core import execute_query
+    
+    # Parse display mode
+    try:
+        mode = DisplayMode.from_string(display_mode)
+    except ValueError as e:
+        if verbose:
+            print(f"Invalid display mode: {e}", file=sys.stderr)
+        mode = DisplayMode.FULL
     
     # Parse the aggregation function if provided
     if value_field:
@@ -59,9 +72,16 @@ def create_multi_comparison(
         if len(versions) < 2:
             return "Need at least 2 versions to compare"
         
-        # Use first version as baseline
-        baseline_version = versions[0]
-        comparison_versions = versions[1:]
+        # Determine baseline version
+        if baseline:
+            if baseline not in versions:
+                return f"Baseline version '{baseline}' not found. Available versions: {', '.join(versions)}"
+            baseline_version = baseline
+            comparison_versions = [v for v in versions if v != baseline]
+        else:
+            # Use first version as baseline by default
+            baseline_version = versions[0]
+            comparison_versions = versions[1:]
         
         if verbose:
             print(f"Baseline: {baseline_version}", file=sys.stderr)
@@ -81,6 +101,7 @@ def create_multi_comparison(
         
         if verbose:
             print(f"Generated query: {data_query}", file=sys.stderr)
+            print(f"Display mode: {mode.name.lower()} - {mode.describe()}", file=sys.stderr)
         
         results = execute_query(cursor, data_query)
         
@@ -133,58 +154,69 @@ def create_multi_comparison(
         baseline_header = "A"
         baseline_width = max(baseline_width, len(baseline_header))
         
-        # Calculate widths for comparison versions and diff columns
+        # Calculate widths and formatted values for comparison versions
         version_widths = {}
-        diff_widths = {}
+        version_formatted_values = {}  # Store pre-calculated formatted values
         
         for version in comparison_versions:
-            version_values = []
-            diff_strings = []
+            formatted_values = []
             
-            for metric in metric_data.values():
-                if version in metric:
-                    version_values.append(metric[version])
+            for metric in sorted(metric_data.keys()):
+                metric_values = metric_data[metric]
+                baseline_val = metric_values.get(baseline_version, 0)
+                comp_val = metric_values.get(version, 0)
+                
+                # Format based on display mode
+                try:
+                    baseline_num = float(baseline_val)
+                    comp_num = float(comp_val)
+                    diff = comp_num - baseline_num
                     
-                    # Calculate diff string to determine width
-                    baseline_val = metric.get(baseline_version, 0)
-                    comp_val = metric.get(version, 0)
+                    # Calculate percentage difference
+                    if baseline_num != 0:
+                        pct_diff = (diff / baseline_num) * 100
+                    else:
+                        pct_diff = float('inf') if diff != 0 else 0
                     
-                    try:
-                        baseline_num = float(baseline_val)
-                        comp_num = float(comp_val)
-                        diff = comp_num - baseline_num
-                        
-                        if baseline_num != 0:
-                            pct_diff = (diff / baseline_num) * 100
-                            diff_str = f"{diff:+.6g} ({pct_diff:+.1f}%)"
+                    # Format based on display mode
+                    comp_str = f"{comp_val:.6g}" if isinstance(comp_val, (int, float)) else str(comp_val)
+                    
+                    if mode == DisplayMode.VALUE:
+                        formatted = comp_str
+                    elif mode == DisplayMode.DIFF:
+                        formatted = f"{diff:+.6g}"
+                    elif mode == DisplayMode.PERCENT or mode == DisplayMode.COMPACT:
+                        if baseline_num == 0 and diff != 0:
+                            formatted = "inf%"
                         else:
-                            if diff == 0:
-                                diff_str = "0"
-                            else:
-                                diff_str = f"{diff:+.6g} (inf%)"
-                    except (ValueError, TypeError):
-                        diff_str = "N/A"
-                    
-                    diff_strings.append(diff_str)
+                            formatted = f"{pct_diff:+.1f}%"
+                    elif mode == DisplayMode.VALUE_DIFF:
+                        formatted = f"{comp_str} ({diff:+.6g})"
+                    elif mode == DisplayMode.VALUE_PERCENT:
+                        if baseline_num == 0 and diff != 0:
+                            formatted = f"{comp_str} (inf%)"
+                        else:
+                            formatted = f"{comp_str} ({pct_diff:+.1f}%)"
+                    else:  # FULL
+                        formatted = f"{comp_str} {diff:+.6g} ({pct_diff:+.1f}%)" if baseline_num != 0 or diff == 0 else f"{comp_str} {diff:+.6g} (inf%)"
+                except (ValueError, TypeError):
+                    formatted = "N/A"
+                
+                formatted_values.append(formatted)
             
-            val_width = max(len(f"{val:.6g}" if isinstance(val, (int, float)) else str(val)) for val in version_values) if version_values else 8
-            # Use letter labels
+            # Calculate column width based on formatted values
+            width = max(len(val) for val in formatted_values) if formatted_values else 8
             version_header = version_labels[version]
-            val_width = max(val_width, len(version_header))
-            version_widths[version] = (val_width, version_header)
-            
-            # Calculate actual diff width needed
-            diff_width = max(len(s) for s in diff_strings) if diff_strings else 15
-            diff_width = max(diff_width, 4)  # Minimum width for "diff" header
-            diff_widths[version] = diff_width
+            width = max(width, len(version_header))
+            version_widths[version] = (width, version_header)
+            version_formatted_values[version] = formatted_values
         
         # Build header
         header_parts = [" " * metric_width, baseline_header.ljust(baseline_width)]
         
         for version in comparison_versions:
             width, letter_label = version_widths[version]
-            diff_width = diff_widths[version]
-            header_parts.extend([letter_label.ljust(width), "diff".ljust(diff_width)])
+            header_parts.append(letter_label.ljust(width))
         
         header = " | ".join(header_parts)
         lines.append(header)
@@ -193,14 +225,13 @@ def create_multi_comparison(
         sep_parts = ["-" * metric_width, "-" * baseline_width]
         for version in comparison_versions:
             width, _ = version_widths[version]
-            diff_width = diff_widths[version]
-            sep_parts.extend(["-" * width, "-" * diff_width])
+            sep_parts.append("-" * width)
         
         separator = "-+-".join(sep_parts)
         lines.append(separator)
         
         # Add data rows
-        for metric in sorted(metric_data.keys()):
+        for i, metric in enumerate(sorted(metric_data.keys())):
             metric_values = metric_data[metric]
             
             # Get baseline value
@@ -210,32 +241,12 @@ def create_multi_comparison(
             # Start building row
             row_parts = [str(metric).ljust(metric_width), baseline_str.ljust(baseline_width)]
             
-            # Add comparison values and differences
+            # Add comparison values
             for version in comparison_versions:
-                comp_val = metric_values.get(version, 0)
-                comp_str = f"{comp_val:.6g}" if isinstance(comp_val, (int, float)) else str(comp_val)
-                
-                # Calculate difference
-                try:
-                    baseline_num = float(baseline_val)
-                    comp_num = float(comp_val)
-                    diff = comp_num - baseline_num
-                    
-                    # Calculate percentage difference
-                    if baseline_num != 0:
-                        pct_diff = (diff / baseline_num) * 100
-                        diff_str = f"{diff:+.6g} ({pct_diff:+.1f}%)"
-                    else:
-                        if diff == 0:
-                            diff_str = "0"
-                        else:
-                            diff_str = f"{diff:+.6g} (inf%)"
-                except (ValueError, TypeError):
-                    diff_str = "N/A"
-                
+                # Get pre-calculated formatted value
+                formatted_value = version_formatted_values[version][i]
                 width, _ = version_widths[version]
-                diff_width = diff_widths[version]
-                row_parts.extend([comp_str.ljust(width), diff_str.ljust(diff_width)])
+                row_parts.append(formatted_value.ljust(width))
             
             row = " | ".join(row_parts)
             lines.append(row)

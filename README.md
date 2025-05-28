@@ -105,28 +105,72 @@ cat data/comparison_test.csv | uplt cmp model_id input_size "avg(latency)"
 
 # Count occurrences (when no value field specified)
 cat data/comparison_test.csv | uplt cmp model_id category
+
+# Different display modes
+cat data.csv | uplt cmp models metrics value --display-mode=value     # Show only values
+cat data.csv | uplt cmp models metrics value --display-mode=diff      # Show only differences
+cat data.csv | uplt cmp models metrics value --display-mode=percent   # Show only percentages
+cat data.csv | uplt cmp models metrics value -m compact               # Short form
 ```
 
-Output format:
+Output format (default: value-percent mode):
 ```
 A: model_a_name
 B: model_b_name
 
-        | A score | B score | diff
---------+---------+---------+----------------
-128     | 10      | 15      | +5 (+50.0%)
-256     | 9       | 17      | +8 (+88.9%)
-512     | 11      | 13      | +2 (+18.2%)
+        | A score | B score    
+--------+---------+------------
+128     | 10      | 15 (+50.0%)
+256     | 9       | 17 (+88.9%)
+512     | 11      | 13 (+18.2%)
 ```
 
 The comparison chart:
 - Shows version/model names at the top to avoid long column headers
 - Uses A/B labels in the table for compact display
 - Compares values between exactly 2 versions/variants
-- Shows absolute and percentage differences
+- Shows values and differences in a single column for B (customizable with display modes)
 - Calculates difference as: B - A
 - Supports all aggregation functions: avg(), sum(), min(), max()
 - Handles missing values by defaulting to 0
+
+#### Multi-comparison chart
+```bash
+# Compare multiple versions against a baseline
+cat data/multi_group_test.csv | uplt multi-comparison model test_case latency
+
+# Short form
+cat data/multi_group_test.csv | uplt mcmp model test_case latency
+
+# With aggregation
+cat data/multi_group_test.csv | uplt mcmp model test_case "avg(latency)"
+
+# Specify custom baseline (default is first version alphabetically)
+cat data/multi_group_test.csv | uplt mcmp model test_case latency --baseline ModelB
+cat data/multi_group_test.csv | uplt mcmp model test_case latency -b ModelC
+```
+
+Output format:
+```
+Baseline (A): ModelA
+B: ModelB
+C: ModelC
+
+             | A   | B            | C           
+-------------+-----+--------------+-------------
+large_input  | 125 | 105 (-16.0%) | 140 (+12.0%)
+medium_input | 78  | 65 (-16.7%)  | 85 (+9.0%)  
+small_input  | 45  | 38 (-15.6%)  | 52 (+15.6%) 
+xlarge_input | 210 | 175 (-16.7%) | 230 (+9.5%)
+```
+
+The multi-comparison chart:
+- Compares 3 or more versions/models
+- Uses the first version alphabetically as baseline by default
+- Allows custom baseline selection with `--baseline` or `-b`
+- Shows all comparisons relative to the baseline
+- Uses letter labels (A, B, C, ...) for compact display
+- Supports all display modes like comparison charts
 
 ## Options
 
@@ -135,6 +179,14 @@ The comparison chart:
 - `--header`: Force treating first row as headers
 - `--no-header`: Force treating first row as data (columns named f1, f2, ..., fn)
 - `--verbose`, `-v`: Show additional information (including generated SQL for charts and aggregated data points)
+- `--display-mode`, `-m`: Display mode for comparison charts (default: value-percent)
+  - `value-percent`: Show value with percentage change (e.g., `15 (+50.0%)`)
+  - `value`: Show only raw values
+  - `diff`: Show only absolute differences
+  - `percent` or `compact`: Show only percentage changes
+  - `value-diff`: Show value with absolute difference
+  - `full`: Show value, absolute difference, and percentage
+- `--baseline`, `-b`: Baseline version for multi-comparison (defaults to first version alphabetically)
 
 ### Header Detection
 
@@ -149,12 +201,14 @@ For convenience, uplt provides short aliases for common commands:
 - `q` → `query`
 - `hm` → `heatmap`
 - `cmp` → `comparison`
+- `mcmp` → `multi-comparison`
 
 Example:
 ```bash
 cat data.csv | uplt q "SELECT * FROM data"
 cat data.csv | uplt hm x_field y_field
 cat data.csv | uplt cmp version metric value
+cat data.csv | uplt mcmp models metrics value
 ```
 
 ## Features
@@ -165,7 +219,9 @@ cat data.csv | uplt cmp version metric value
 - Sanitized column names for valid SQL identifiers
 - In-memory SQLite database for fast queries
 - Standard CSV output format
-- Multiple chart types: heatmaps and comparisons
+- Multiple chart types: heatmaps, comparisons, and multi-comparisons
+- Customizable display modes for comparison charts
+- Baseline selection for multi-comparison charts
 - Verbose mode for debugging with `-v` flag
 
 ## Development

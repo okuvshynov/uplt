@@ -1,7 +1,7 @@
 # uplt Development Notes
 
 ## Project Overview
-uplt is a Python package that allows users to execute SQL queries on CSV data from stdin and create terminal-based charts. It supports both raw SQL queries and built-in chart types like heatmaps.
+uplt is a Python package that allows users to execute SQL queries on CSV data from stdin and create terminal-based charts. It supports both raw SQL queries and built-in chart types like heatmaps, comparisons, and multi-comparisons.
 
 ## Key Components
 
@@ -10,6 +10,12 @@ uplt is a Python package that allows users to execute SQL queries on CSV data fr
 - `src/uplt/query_builder.py`: SQL query construction for chart commands
 - `src/uplt/charts.py`: Terminal chart rendering using Unicode characters
 - `src/uplt/cli.py`: Command-line interface
+- `src/uplt/charts/`: Chart implementations
+  - `heatmap.py`: Heatmap visualization with automatic axis detection
+  - `comparison.py`: Two-version comparison charts
+  - `multi_comparison.py`: Multi-version comparison charts with baseline selection
+  - `display_mode.py`: Display mode configuration for comparison charts
+  - `utils.py`: Shared utilities for chart rendering
 
 ### Testing
 - Comprehensive test suite in `tests/` directory
@@ -93,8 +99,37 @@ cat data/comparison_test.csv | uplt cmp model_id input_size "max(value)"
 # Without value field (counts occurrences)
 cat data/comparison_test.csv | uplt cmp model_id input_size
 
+# Display modes (default: value-percent)
+cat data.csv | uplt cmp models metrics value --display-mode=value     # Values only
+cat data.csv | uplt cmp models metrics value --display-mode=diff      # Differences only
+cat data.csv | uplt cmp models metrics value --display-mode=percent   # Percentages only
+cat data.csv | uplt cmp models metrics value -m compact               # Same as percent
+cat data.csv | uplt cmp models metrics value -m value-diff            # Value with diff
+cat data.csv | uplt cmp models metrics value -m full                  # Everything
+
 # Verbose mode shows generated SQL and data points
 cat data/comparison_test.csv | uplt -v cmp model_id input_size score
+```
+
+### Chart Mode (Multi-Comparison)
+```bash
+# Compare multiple versions against a baseline
+cat data/multi_group_test.csv | uplt multi-comparison model test_case latency
+# Short form
+cat data/multi_group_test.csv | uplt mcmp model test_case latency
+
+# With aggregation
+cat data/multi_group_test.csv | uplt mcmp model test_case "avg(latency)"
+
+# Specify custom baseline (default: first version alphabetically)
+cat data/multi_group_test.csv | uplt mcmp model test_case latency --baseline ModelB
+cat data/multi_group_test.csv | uplt mcmp model test_case latency -b ModelC
+
+# Display modes work the same as comparison
+cat data.csv | uplt mcmp models metrics value -m percent
+
+# Verbose mode shows baseline selection
+cat data.csv | uplt -v mcmp models metrics value
 ```
 
 ## Implementation Notes
@@ -123,26 +158,51 @@ cat data/comparison_test.csv | uplt -v cmp model_id input_size score
 
 ### Comparison Visualization
 - **Purpose**: Compares values between two versions/variants across multiple metrics
-- **Layout**: 
+- **Layout** (simplified in recent update): 
   - Version labels shown at the top (A: version_name, B: version_name)
-  - Table format with A/B column headers for compactness:
+  - Table format with merged B column showing value and difference:
     - First column: metric names
     - Second column: values from version A
-    - Third column: values from version B
-    - Fourth column: difference (absolute and percentage)
+    - Third column: values from version B with difference (format depends on display mode)
+- **Display Modes**:
+  - `value-percent` (default): Shows value with percentage, e.g., `15 (+50.0%)`
+  - `value`: Shows only raw values
+  - `diff`: Shows only absolute differences
+  - `percent` or `compact`: Shows only percentage changes
+  - `value-diff`: Shows value with absolute difference
+  - `full`: Shows value, absolute difference, and percentage
 - **Usage**:
   - `versions_field`: Field containing version identifiers (typically 2 distinct values)
   - `metrics_field`: Field containing metric names (rows in the output)
   - `value_field`: Optional field to aggregate (defaults to COUNT if not specified)
 - **Features**:
-  - Compact display with A/B labels to fit in 80-character terminals
+  - Compact display with A/B labels to fit in narrow terminals
   - Automatic percentage calculation
   - Handles missing values (defaults to 0)
   - Supports all aggregation functions: avg(), sum(), min(), max(), count()
   - Verbose mode shows generated SQL and all data points
   - When more than 2 groups exist, compares first 2 alphabetically (with warning in verbose mode)
 - **Difference Calculation**: B - A, with percentage relative to A
-- **Multiple Groups**: For datasets with >2 groups, use filtering (grep, SQL query) to select exactly 2 groups for comparison
+- **Multiple Groups**: For datasets with >2 groups, use multi-comparison or filter to select exactly 2 groups
+
+### Multi-Comparison Visualization
+- **Purpose**: Compares multiple versions/models against a baseline
+- **Layout**: 
+  - Baseline and comparison versions shown at the top
+  - Table format with baseline in first data column:
+    - First column: metric names
+    - Second column: baseline values (labeled A)
+    - Subsequent columns: comparison values with differences (labeled B, C, D, ...)
+- **Baseline Selection**:
+  - Default: First version alphabetically
+  - Custom: Use `--baseline` or `-b` to specify
+  - Error handling: Shows available versions if baseline not found
+- **Features**:
+  - Supports 3+ versions
+  - All comparisons relative to the baseline
+  - Same display modes as comparison charts
+  - Letter labels for compact display
+  - Handles missing values gracefully
 
 ### CSV Handling
 - **Automatic Header Detection**: By default, uplt automatically detects whether the first row contains headers
@@ -165,12 +225,16 @@ cat data/comparison_test.csv | uplt -v cmp model_id input_size score
 
 ### Feature Improvements
 - **New comparison chart**: Compare values between two versions/variants with `comparison` or `cmp` command
-- **Short command aliases**: Use `q` for `query`, `hm` for `heatmap`, and `cmp` for `comparison`
+- **Multi-comparison chart**: Compare 3+ versions against a baseline with `multi-comparison` or `mcmp` command
+- **Short command aliases**: Use `q` for `query`, `hm` for `heatmap`, `cmp` for `comparison`, and `mcmp` for `multi-comparison`
 - **Verbose mode**: Added `-v`/`--verbose` flag to display generated SQL queries and data points
 - **Automatic header detection**: Intelligently determines if CSV has headers (PR #6)
 - **Enhanced heatmap legend**: Shows exact value ranges for each character (PR #5)
 - **Fixed aggregation**: Proper SQL-based aggregation without double processing (PR #4)
 - **Zero-based scale**: For non-negative data, scale starts at 0 for better visualization (PR #7)
+- **Display modes for comparisons**: Customizable output format with `--display-mode` or `-m` flag
+- **Baseline selection**: Choose baseline for multi-comparison with `--baseline` or `-b` flag
+- **Simplified comparison layout**: Merged value and difference columns for more concise output
 
 ## Future Enhancements
 - Add more chart types (bar charts, line charts, scatter plots)

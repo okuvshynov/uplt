@@ -12,11 +12,12 @@ def create_multi_comparison(
     value_field: Optional[str],
     table_name: str,
     verbose: bool = False,
-    display_mode: str = 'value-percent'
+    display_mode: str = 'value-percent',
+    baseline: Optional[str] = None
 ) -> Optional[str]:
     """
     Create a multi-comparison chart showing differences between multiple versions.
-    Uses the first version as baseline and compares all others to it.
+    Uses the first version as baseline (or specified baseline) and compares all others to it.
     
     Args:
         cursor: Database cursor
@@ -25,6 +26,8 @@ def create_multi_comparison(
         value_field: Optional field to aggregate (defaults to COUNT)
         table_name: Name of the table
         verbose: Whether to show additional debug info
+        display_mode: Display mode for difference formatting
+        baseline: Optional baseline version to compare against (defaults to first version)
     
     Returns:
         Formatted multi-comparison chart as string
@@ -69,9 +72,16 @@ def create_multi_comparison(
         if len(versions) < 2:
             return "Need at least 2 versions to compare"
         
-        # Use first version as baseline
-        baseline_version = versions[0]
-        comparison_versions = versions[1:]
+        # Determine baseline version
+        if baseline:
+            if baseline not in versions:
+                return f"Baseline version '{baseline}' not found. Available versions: {', '.join(versions)}"
+            baseline_version = baseline
+            comparison_versions = [v for v in versions if v != baseline]
+        else:
+            # Use first version as baseline by default
+            baseline_version = versions[0]
+            comparison_versions = versions[1:]
         
         if verbose:
             print(f"Baseline: {baseline_version}", file=sys.stderr)

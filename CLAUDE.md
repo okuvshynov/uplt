@@ -12,8 +12,7 @@ uplt is a Python package that allows users to execute SQL queries on CSV data fr
 - `src/uplt/cli.py`: Command-line interface
 - `src/uplt/charts/`: Chart implementations
   - `heatmap.py`: Heatmap visualization with automatic axis detection
-  - `comparison.py`: Two-version comparison charts
-  - `multi_comparison.py`: Multi-version comparison charts with baseline selection
+  - `multi_comparison.py`: Unified comparison charts (supports 2+ versions) with baseline selection
   - `display_mode.py`: Display mode configuration for comparison charts
   - `utils.py`: Shared utilities for chart rendering
 

@@ -12,7 +12,7 @@ def create_comparison(
     value_field: Optional[str],
     table_name: str,
     verbose: bool = False,
-    display_mode: str = 'full'
+    display_mode: str = 'value-percent'
 ) -> Optional[str]:
     """
     Create a comparison chart showing differences between versions.
@@ -131,46 +131,18 @@ def create_comparison(
         
         # Determine value widths
         a_values = []
-        b_values = []
-        for metric in metric_data.values():
-            if version_a in metric:
-                a_values.append(metric[version_a])
-            if version_b in metric:
-                b_values.append(metric[version_b])
+        b_formatted_values = []  # Will store the formatted B column values based on display mode
         
-        a_width = max(len(f"{val:.6g}" if isinstance(val, (int, float)) else str(val)) for val in a_values) if a_values else 8
-        b_width = max(len(f"{val:.6g}" if isinstance(val, (int, float)) else str(val)) for val in b_values) if b_values else 8
-        
-        # Use shorter headers with just A/B
-        value_suffix = f" {value_field}" if value_field else " count"
-        a_header = f"A{value_suffix}"
-        b_header = f"B{value_suffix}"
-        a_width = max(a_width, len(a_header))
-        b_width = max(b_width, len(b_header))
-        
-        diff_width = mode.get_diff_column_width()  # Dynamic based on display mode
-        
-        # Build header
-        header = " " * metric_width + " | " + a_header.ljust(a_width) + " | " + b_header.ljust(b_width) + " | diff"
-        lines.append(header)
-        
-        # Add separator
-        separator = "-" * metric_width + "-+-" + "-" * a_width + "-+-" + "-" * b_width + "-+-" + "-" * diff_width
-        lines.append(separator)
-        
-        # Add data rows
+        # First pass: calculate all B column values based on display mode
         for metric in sorted(metric_data.keys()):
             metric_values = metric_data[metric]
-            
-            # Get values for both versions
             val_a = metric_values.get(version_a, 0)
             val_b = metric_values.get(version_b, 0)
             
-            # Format values
-            val_a_str = f"{val_a:.6g}" if isinstance(val_a, (int, float)) else str(val_a)
-            val_b_str = f"{val_b:.6g}" if isinstance(val_b, (int, float)) else str(val_b)
+            if version_a in metric_values:
+                a_values.append(val_a)
             
-            # Calculate difference based on display mode
+            # Format B column based on display mode
             try:
                 val_a_num = float(val_a)
                 val_b_num = float(val_b)
@@ -183,25 +155,65 @@ def create_comparison(
                     pct_diff = float('inf') if diff != 0 else 0
                 
                 # Format based on display mode
-                if mode.should_show_value_in_diff_column():
-                    # For VALUE mode variants, show the B value instead of diff
-                    if mode == DisplayMode.VALUE:
-                        diff_str = val_b_str
-                    elif mode == DisplayMode.VALUE_DIFF:
-                        diff_str = f"{val_b_str} ({diff:+.6g})"
-                    else:  # VALUE_PERCENT
-                        if val_a_num == 0 and diff != 0:
-                            diff_str = f"{val_b_str} (inf%)"
-                        else:
-                            diff_str = f"{val_b_str} ({pct_diff:+.1f}%)"
-                else:
-                    # Use the display mode's formatting method
-                    diff_str = mode.format_diff_cell(diff, pct_diff, val_a_num)
+                val_b_str = f"{val_b:.6g}" if isinstance(val_b, (int, float)) else str(val_b)
+                
+                if mode == DisplayMode.VALUE:
+                    b_formatted = val_b_str
+                elif mode == DisplayMode.DIFF:
+                    b_formatted = f"{diff:+.6g}"
+                elif mode == DisplayMode.PERCENT or mode == DisplayMode.COMPACT:
+                    if val_a_num == 0 and diff != 0:
+                        b_formatted = "inf%"
+                    else:
+                        b_formatted = f"{pct_diff:+.1f}%"
+                elif mode == DisplayMode.VALUE_DIFF:
+                    b_formatted = f"{val_b_str} ({diff:+.6g})"
+                elif mode == DisplayMode.VALUE_PERCENT:
+                    if val_a_num == 0 and diff != 0:
+                        b_formatted = f"{val_b_str} (inf%)"
+                    else:
+                        b_formatted = f"{val_b_str} ({pct_diff:+.1f}%)"
+                else:  # FULL
+                    b_formatted = f"{val_b_str} {diff:+.6g} ({pct_diff:+.1f}%)" if val_a_num != 0 or diff == 0 else f"{val_b_str} {diff:+.6g} (inf%)"
             except (ValueError, TypeError):
-                diff_str = "N/A"
+                b_formatted = "N/A"
+            
+            b_formatted_values.append(b_formatted)
+        
+        # Calculate column widths
+        a_width = max(len(f"{val:.6g}" if isinstance(val, (int, float)) else str(val)) for val in a_values) if a_values else 8
+        b_width = max(len(val) for val in b_formatted_values) if b_formatted_values else 8
+        
+        # Use shorter headers with just A/B
+        value_suffix = f" {value_field}" if value_field else " count"
+        a_header = f"A{value_suffix}"
+        b_header = f"B{value_suffix}"
+        a_width = max(a_width, len(a_header))
+        b_width = max(b_width, len(b_header))
+        
+        # Build header
+        header = " " * metric_width + " | " + a_header.ljust(a_width) + " | " + b_header.ljust(b_width)
+        lines.append(header)
+        
+        # Add separator
+        separator = "-" * metric_width + "-+-" + "-" * a_width + "-+-" + "-" * b_width
+        lines.append(separator)
+        
+        # Add data rows
+        for i, metric in enumerate(sorted(metric_data.keys())):
+            metric_values = metric_data[metric]
+            
+            # Get values for both versions
+            val_a = metric_values.get(version_a, 0)
+            
+            # Format A value
+            val_a_str = f"{val_a:.6g}" if isinstance(val_a, (int, float)) else str(val_a)
+            
+            # Get pre-calculated B column value
+            b_formatted = b_formatted_values[i]
             
             # Build row
-            row = str(metric).ljust(metric_width) + " | " + val_a_str.ljust(a_width) + " | " + val_b_str.ljust(b_width) + " | " + diff_str
+            row = str(metric).ljust(metric_width) + " | " + val_a_str.ljust(a_width) + " | " + b_formatted.ljust(b_width)
             lines.append(row)
         
         return "\n".join(lines)

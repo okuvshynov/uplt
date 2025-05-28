@@ -35,8 +35,8 @@ def main():
                              help='Force treating first row as data')
     parser.add_argument('--verbose', '-v', action='store_true',
                        help='Show additional information')
-    parser.add_argument('--display-mode', '-m', default='full',
-                       help='Display mode for comparison charts: full (default), compact, value, diff, percent, value-diff, value-percent')
+    parser.add_argument('--display-mode', '-m', default='value-percent',
+                       help='Display mode for comparison charts: value-percent (default), full, compact, value, diff, percent, value-diff')
     
     args = parser.parse_args()
     

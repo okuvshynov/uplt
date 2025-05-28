@@ -168,12 +168,10 @@ class TestComparison:
         # Check header
         assert "A score" in result
         assert "B score" in result
-        assert "diff" in result
         
         # Check values
         assert "10" in result  # A's score for 128
-        assert "15" in result  # B's score for 128
-        assert "+5 (+50.0%)" in result  # Difference
+        assert "15 (+50.0%)" in result  # B's score for 128 with percentage (default mode)
         
         # Check all rows are present
         assert "128" in result
@@ -192,8 +190,7 @@ class TestComparison:
         
         # Check specific values
         assert "10" in result  # A's latency for 128
-        assert "12" in result  # B's latency for 128
-        assert "+2 (+20.0%)" in result
+        assert "12 (+20.0%)" in result  # B's latency for 128 with percentage
     
     def test_comparison_without_value_field(self):
         """Test comparison with COUNT(*) when no value field is specified."""
@@ -206,7 +203,7 @@ class TestComparison:
         assert "B count" in result
         
         # Each combination should have count of 1
-        assert "+0 (+0.0%)" in result
+        assert "1 (+0.0%)" in result
     
     def test_comparison_with_missing_values(self):
         """Test comparison when one version has missing data."""
@@ -253,9 +250,9 @@ class TestComparison:
         assert "small" in result
         assert "medium" in result
         assert "large" in result
-        assert "+5 (+50.0%)" in result  # small: 15-10
-        assert "+5 (+25.0%)" in result  # medium: 25-20
-        assert "-3 (-10.0%)" in result  # large: 27-30
+        assert "15 (+50.0%)" in result  # small: 15 with +50% increase
+        assert "25 (+25.0%)" in result  # medium: 25 with +25% increase
+        assert "27 (-10.0%)" in result  # large: 27 with -10% decrease
     
     def test_comparison_verbose_mode(self):
         """Test comparison with verbose mode enabled."""

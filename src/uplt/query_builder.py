@@ -42,9 +42,11 @@ def parse_chart_command(args: List[str]) -> Tuple[str, dict]:
     chart_type = args[0]
     
     # Map short versions to full chart types
+    # Note: 'comparison' is deprecated and maps to 'multi-comparison'
     chart_aliases = {
         'hm': 'heatmap',
-        'cmp': 'comparison',
+        'cmp': 'multi-comparison',  # Deprecated: now maps to multi-comparison
+        'comparison': 'multi-comparison',  # Deprecated: now maps to multi-comparison
         'mcmp': 'multi-comparison'
     }
     chart_type = chart_aliases.get(chart_type, chart_type)
@@ -56,17 +58,6 @@ def parse_chart_command(args: List[str]) -> Tuple[str, dict]:
         options = {
             "x_field": args[1],
             "y_field": args[2],
-            "value_field": args[3] if len(args) > 3 else None
-        }
-        return chart_type, options
-    
-    elif chart_type == "comparison":
-        if len(args) < 3:
-            raise ValueError("Comparison requires at least versions_field and metrics_field")
-        
-        options = {
-            "versions_field": args[1],
-            "metrics_field": args[2],
             "value_field": args[3] if len(args) > 3 else None
         }
         return chart_type, options

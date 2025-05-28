@@ -188,7 +188,8 @@ cat data.csv | uplt -v mcmp models metrics value
   - Function nesting: UPPER(substr(field, 1, 5))
   - This enables dynamic data transformation without preprocessing CSV files
 
-### Comparison Visualization
+### Comparison Visualization (Deprecated - use Multi-comparison)
+- **Note**: The standalone comparison mode has been deprecated. Use `mcmp` or `cmp` which now both route to multi-comparison
 - **Purpose**: Compares values between two versions/variants across multiple metrics
 - **Layout** (simplified in recent update): 
   - Version labels shown at the top (A: version_name, B: version_name)
@@ -218,7 +219,8 @@ cat data.csv | uplt -v mcmp models metrics value
 - **Multiple Groups**: For datasets with >2 groups, use multi-comparison or filter to select exactly 2 groups
 
 ### Multi-Comparison Visualization
-- **Purpose**: Compares multiple versions/models against a baseline
+- **Purpose**: Compares 2 or more versions/models (unified comparison mode)
+- **Note**: Both `cmp` and `mcmp` commands route here, supporting any number of versions
 - **Layout**: 
   - Baseline and comparison versions shown at the top
   - Table format with baseline in first data column:
@@ -256,8 +258,8 @@ cat data.csv | uplt -v mcmp models metrics value
 - Consolidated chart rendering logic
 
 ### Feature Improvements
-- **New comparison chart**: Compare values between two versions/variants with `comparison` or `cmp` command
-- **Multi-comparison chart**: Compare 3+ versions against a baseline with `multi-comparison` or `mcmp` command
+- **Unified comparison mode**: Both `cmp` and `mcmp` now use multi-comparison, supporting any number of versions (2+)
+- **Deprecated comparison chart**: The separate comparison mode has been deprecated in favor of unified multi-comparison
 - **Short command aliases**: Use `q` for `query`, `hm` for `heatmap`, `cmp` for `comparison`, and `mcmp` for `multi-comparison`
 - **Verbose mode**: Added `-v`/`--verbose` flag to display generated SQL queries and data points
 - **Automatic header detection**: Intelligently determines if CSV has headers (PR #6)

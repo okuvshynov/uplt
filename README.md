@@ -39,8 +39,11 @@ cat data.csv | uplt heatmap x_field y_field
 # Heatmap with aggregation
 cat data.csv | uplt heatmap department age "avg(salary)"
 
-# Compare two versions/models
-cat data.csv | uplt comparison model_id metric_name score
+# Compare versions/models (works with 2+ versions)
+cat data.csv | uplt mcmp model_id metric_name score
+
+# Short form (cmp is an alias for mcmp)
+cat data.csv | uplt cmp model_id metric_name score
 ```
 
 ## Examples
@@ -116,10 +119,10 @@ The heatmap uses Unicode block characters (░▒▓█) to show intensity. It a
 
 #### Comparison chart
 ```bash
-# Basic comparison (shows difference in values between two versions)
-cat data/comparison_test.csv | uplt comparison model_id input_size score
+# Compare 2 or more versions/models
+cat data/comparison_test.csv | uplt mcmp model_id input_size score
 
-# Short form
+# Short form (cmp is an alias for mcmp)
 cat data/comparison_test.csv | uplt cmp model_id input_size score
 
 # With aggregation
@@ -133,66 +136,37 @@ cat data.csv | uplt cmp models metrics value --display-mode=value     # Show onl
 cat data.csv | uplt cmp models metrics value --display-mode=diff      # Show only differences
 cat data.csv | uplt cmp models metrics value --display-mode=percent   # Show only percentages
 cat data.csv | uplt cmp models metrics value -m compact               # Short form
+
+# Specify custom baseline (default is first version alphabetically)
+cat data.csv | uplt cmp model test_case latency --baseline ModelB
+cat data.csv | uplt cmp model test_case latency -b ModelC
 ```
 
-Output format (default: value-percent mode):
+Output format with 2 versions:
 ```
-A: model_a_name
-B: model_b_name
+        | v1 | v2         
+--------+----+------------
+test1   | 10 | 15 (+50.0%)
+test2   | 20 | 30 (+50.0%)
+```
 
-        | A score | B score    
---------+---------+------------
-128     | 10      | 15 (+50.0%)
-256     | 9       | 17 (+88.9%)
-512     | 11      | 13 (+18.2%)
+Output format with 3+ versions:
+```
+        | v1 | v2          | v3         
+--------+----+-------------+------------
+test1   | 10 | 15 (+50.0%) | 12 (+20.0%)
+test2   | 20 | 30 (+50.0%) | 25 (+25.0%)
 ```
 
 The comparison chart:
-- Shows version/model names at the top to avoid long column headers
-- Uses A/B labels in the table for compact display
-- Compares values between exactly 2 versions/variants
-- Shows values and differences in a single column for B (customizable with display modes)
-- Calculates difference as: B - A
+- Works with any number of versions (2 or more)
+- Uses original names when short enough (≤8 chars), otherwise shows letter labels with legend
+- First version (alphabetically) is used as baseline for percentage calculations
+- Supports custom baseline selection with `--baseline` or `-b`
+- Shows all comparisons relative to the baseline
 - Supports all aggregation functions: avg(), sum(), min(), max()
 - Handles missing values by defaulting to 0
 
-#### Multi-comparison chart
-```bash
-# Compare multiple versions against a baseline
-cat data/multi_group_test.csv | uplt multi-comparison model test_case latency
-
-# Short form
-cat data/multi_group_test.csv | uplt mcmp model test_case latency
-
-# With aggregation
-cat data/multi_group_test.csv | uplt mcmp model test_case "avg(latency)"
-
-# Specify custom baseline (default is first version alphabetically)
-cat data/multi_group_test.csv | uplt mcmp model test_case latency --baseline ModelB
-cat data/multi_group_test.csv | uplt mcmp model test_case latency -b ModelC
-```
-
-Output format:
-```
-Baseline (A): ModelA
-B: ModelB
-C: ModelC
-
-             | A   | B            | C           
--------------+-----+--------------+-------------
-large_input  | 125 | 105 (-16.0%) | 140 (+12.0%)
-medium_input | 78  | 65 (-16.7%)  | 85 (+9.0%)  
-small_input  | 45  | 38 (-15.6%)  | 52 (+15.6%) 
-xlarge_input | 210 | 175 (-16.7%) | 230 (+9.5%)
-```
-
-The multi-comparison chart:
-- Compares 3 or more versions/models
-- Uses the first version alphabetically as baseline by default
-- Allows custom baseline selection with `--baseline` or `-b`
-- Shows all comparisons relative to the baseline
-- Uses letter labels (A, B, C, ...) for compact display
-- Supports all display modes like comparison charts
 
 ## Options
 
@@ -222,15 +196,14 @@ By default, uplt automatically detects whether the first row contains headers by
 For convenience, uplt provides short aliases for common commands:
 - `q` → `query`
 - `hm` → `heatmap`
-- `cmp` → `comparison`
-- `mcmp` → `multi-comparison`
+- `cmp` → `mcmp` (comparison, works with 2+ versions)
+- `mcmp` → `multi-comparison` (explicit multi-comparison command)
 
 Example:
 ```bash
 cat data.csv | uplt q "SELECT * FROM data"
 cat data.csv | uplt hm x_field y_field
-cat data.csv | uplt cmp version metric value
-cat data.csv | uplt mcmp models metrics value
+cat data.csv | uplt cmp version metric value  # Works with any number of versions
 ```
 
 ## Features
@@ -241,9 +214,9 @@ cat data.csv | uplt mcmp models metrics value
 - Sanitized column names for valid SQL identifiers
 - In-memory SQLite database for fast queries
 - Standard CSV output format
-- Multiple chart types: heatmaps, comparisons, and multi-comparisons
+- Multiple chart types: heatmaps and comparisons (supports 2+ versions)
 - Customizable display modes for comparison charts
-- Baseline selection for multi-comparison charts
+- Baseline selection for comparisons with 3+ versions
 - Verbose mode for debugging with `-v` flag
 - **SQLite function support**: Use any SQLite function (substr, upper, lower, length, etc.) in field arguments for dynamic data transformation and grouping
 

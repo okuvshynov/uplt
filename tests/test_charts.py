@@ -7,7 +7,7 @@ from uplt.charts.utils import (
 )
 from uplt.charts import (
     create_heatmap,
-    create_comparison
+    create_multi_comparison
 )
 
 
@@ -156,14 +156,14 @@ class TestComparison:
     
     def test_basic_comparison(self):
         """Test basic comparison with raw value field."""
-        result = create_comparison(
+        result = create_multi_comparison(
             self.cursor, "model_id", "input_size", "score", "test_data"
         )
         
         assert result is not None
         # With short names like A and B, they should be used directly
-        assert "| A score" in result
-        assert "| B score" in result
+        assert "| A " in result
+        assert "| B " in result
         # Should NOT have letter label legend since names are short
         assert "A: A" not in result
         assert "B: B" not in result
@@ -179,13 +179,14 @@ class TestComparison:
     
     def test_comparison_with_aggregation(self):
         """Test comparison with aggregation function."""
-        result = create_comparison(
+        result = create_multi_comparison(
             self.cursor, "model_id", "input_size", "avg(latency)", "test_data"
         )
         
         assert result is not None
-        assert "A avg(latency)" in result
-        assert "B avg(latency)" in result
+        # Multi-comparison doesn't include field name in headers
+        assert "| A " in result
+        assert "| B " in result
         
         # Check specific values
         assert "10" in result  # A's latency for 128
@@ -193,13 +194,14 @@ class TestComparison:
     
     def test_comparison_without_value_field(self):
         """Test comparison with COUNT(*) when no value field is specified."""
-        result = create_comparison(
+        result = create_multi_comparison(
             self.cursor, "model_id", "input_size", None, "test_data"
         )
         
         assert result is not None
-        assert "A count" in result
-        assert "B count" in result
+        # Multi-comparison doesn't include field name in headers
+        assert "| A " in result
+        assert "| B " in result
         
         # Each combination should have count of 1
         assert "1 (+0.0%)" in result
@@ -209,7 +211,7 @@ class TestComparison:
         # Add data where B doesn't have a value for input_size 1024
         self.cursor.execute("INSERT INTO test_data VALUES ('A', 1024, 100, 20)")
         
-        result = create_comparison(
+        result = create_multi_comparison(
             self.cursor, "model_id", "input_size", "score", "test_data"
         )
         
@@ -239,14 +241,14 @@ class TestComparison:
         ]
         self.cursor.executemany("INSERT INTO cat_data VALUES (?, ?, ?)", data)
         
-        result = create_comparison(
+        result = create_multi_comparison(
             self.cursor, "version", "category", "count", "cat_data"
         )
         
         assert result is not None
         # v1 and v2 are short enough to use directly
-        assert "| v1 count" in result
-        assert "| v2 count" in result
+        assert "| v1 " in result
+        assert "| v2 " in result
         # Should NOT have letter label legend
         assert "A: v1" not in result
         assert "B: v2" not in result
@@ -259,22 +261,22 @@ class TestComparison:
     
     def test_comparison_verbose_mode(self):
         """Test comparison with verbose mode enabled."""
-        result = create_comparison(
+        result = create_multi_comparison(
             self.cursor, "model_id", "input_size", "score", "test_data",
             verbose=True
         )
         
         assert result is not None
         # Result should still be generated in verbose mode
-        assert "A score" in result
-        assert "B score" in result
+        assert "| A " in result
+        assert "| B " in result
     
     def test_comparison_with_null_values(self):
         """Test comparison handles NULL values correctly."""
         self.cursor.execute("INSERT INTO test_data VALUES ('A', 768, NULL, 25)")
         self.cursor.execute("INSERT INTO test_data VALUES ('B', 768, 40, NULL)")
         
-        result = create_comparison(
+        result = create_multi_comparison(
             self.cursor, "model_id", "input_size", "score", "test_data"
         )
         
@@ -286,7 +288,7 @@ class TestComparison:
         # Create table with only one version
         self.cursor.execute("DELETE FROM test_data WHERE model_id = 'B'")
         
-        result = create_comparison(
+        result = create_multi_comparison(
             self.cursor, "model_id", "input_size", "score", "test_data"
         )
         
@@ -296,7 +298,7 @@ class TestComparison:
         """Test comparison with no data."""
         self.cursor.execute("DELETE FROM test_data")
         
-        result = create_comparison(
+        result = create_multi_comparison(
             self.cursor, "model_id", "input_size", "score", "test_data"
         )
         
@@ -309,23 +311,25 @@ class TestComparison:
         self.cursor.execute("INSERT INTO test_data VALUES ('C', 256, 30, 25)")
         self.cursor.execute("INSERT INTO test_data VALUES ('C', 512, 60, 18)")
         
-        result = create_comparison(
+        result = create_multi_comparison(
             self.cursor, "model_id", "input_size", "score", "test_data"
         )
         
         assert result is not None
-        # Should compare A and B (first two alphabetically)
+        # Multi-comparison now shows all versions (A, B, C)
         # With short names, they're used directly
-        assert "| A score" in result
-        assert "| B score" in result
+        assert "| A " in result
+        assert "| B " in result
+        assert "| C " in result
         # Should NOT have letter label legend
         assert "A: A" not in result
         assert "B: B" not in result
-        assert "C:" not in result  # C should not appear
+        assert "C: C" not in result
         
-        # Check it still shows correct values for A and B
+        # Check it shows correct values for all models
         assert "10" in result  # A's score for 128
         assert "15" in result  # B's score for 128
+        assert "20" in result  # C's score for 128
 
 
 class TestChartsWithSQLiteFunctions:
@@ -432,8 +436,8 @@ class TestChartsWithSQLiteFunctions:
         self.cursor.execute("UPDATE products SET version = 'v1' WHERE rowid <= 4")
         self.cursor.execute("UPDATE products SET version = 'v2' WHERE rowid > 4")
         
-        from uplt.charts.comparison import create_comparison
-        result = create_comparison(
+        from uplt.charts.multi_comparison import create_multi_comparison
+        result = create_multi_comparison(
             self.cursor, "UPPER(version)", "UPPER(category)", "sum(quantity)", "products"
         )
         
@@ -452,8 +456,8 @@ class TestChartsWithSQLiteFunctions:
         self.cursor.execute("UPDATE products SET model = 'model_v1' WHERE rowid <= 4")
         self.cursor.execute("UPDATE products SET model = 'model_v2' WHERE rowid > 4")
         
-        from uplt.charts.comparison import create_comparison
-        result = create_comparison(
+        from uplt.charts.multi_comparison import create_multi_comparison
+        result = create_multi_comparison(
             self.cursor, "substr(model, -2)", "category", "avg(price)", "products"
         )
         
@@ -573,8 +577,8 @@ class TestVersionLabeling:
     
     def test_comparison_with_short_names(self):
         """Test that short version names are used directly in comparison."""
-        from uplt.charts.comparison import create_comparison
-        result = create_comparison(
+        from uplt.charts.multi_comparison import create_multi_comparison
+        result = create_multi_comparison(
             self.cursor, "version", "metric", "value", "short_names"
         )
         
@@ -588,14 +592,14 @@ class TestVersionLabeling:
     
     def test_comparison_with_long_names(self):
         """Test that long version names use letter labels in comparison."""
-        from uplt.charts.comparison import create_comparison
-        result = create_comparison(
+        from uplt.charts.multi_comparison import create_multi_comparison
+        result = create_multi_comparison(
             self.cursor, "version", "metric", "value", "long_names"
         )
         
         assert result is not None
         # Should have letter labels
-        assert "A: model_version_1" in result
+        assert "Baseline (A): model_version_1" in result
         assert "B: model_version_2" in result
         # Should use A/B in table headers
         assert "| A " in result
@@ -709,7 +713,7 @@ class TestChartsWithArithmeticExpressions:
         self.cursor.execute("UPDATE products SET version = 'v1' WHERE rowid % 2 = 0")
         self.cursor.execute("UPDATE products SET version = 'v2' WHERE rowid % 2 = 1")
         
-        result = create_comparison(
+        result = create_multi_comparison(
             self.cursor, 
             "version", 
             "CASE WHEN quantity < 30 THEN 'low_stock' WHEN quantity < 100 THEN 'medium_stock' ELSE 'high_stock' END",

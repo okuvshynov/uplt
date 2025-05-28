@@ -5,7 +5,7 @@ from typing import Optional, List
 from .display_mode import DisplayMode
 
 
-def should_use_original_names(names: List[str], max_length: int = 15) -> bool:
+def should_use_original_names(names: List[str], max_length: int = 8) -> bool:
     """
     Determine if original names should be used instead of letter labels.
     

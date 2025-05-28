@@ -35,6 +35,8 @@ def main():
                              help='Force treating first row as data')
     parser.add_argument('--verbose', '-v', action='store_true',
                        help='Show additional information')
+    parser.add_argument('--display-mode', '-m', default='full',
+                       help='Display mode for comparison charts: full (default), compact, value, diff, percent, value-diff, value-percent')
     
     args = parser.parse_args()
     
@@ -144,7 +146,8 @@ def main():
                         options["metrics_field"],
                         options["value_field"],
                         args.table_name,
-                        verbose=args.verbose
+                        verbose=args.verbose,
+                        display_mode=args.display_mode
                     )
                     
                     if chart:
@@ -161,7 +164,8 @@ def main():
                         options["metrics_field"],
                         options["value_field"],
                         args.table_name,
-                        verbose=args.verbose
+                        verbose=args.verbose,
+                        display_mode=args.display_mode
                     )
                     
                     if chart:

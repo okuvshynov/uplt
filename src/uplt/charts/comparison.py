@@ -2,6 +2,7 @@
 import sqlite3
 import sys
 from typing import Optional
+from .display_mode import DisplayMode
 
 
 def create_comparison(
@@ -10,7 +11,8 @@ def create_comparison(
     metrics_field: str, 
     value_field: Optional[str],
     table_name: str,
-    verbose: bool = False
+    verbose: bool = False,
+    display_mode: str = 'full'
 ) -> Optional[str]:
     """
     Create a comparison chart showing differences between versions.
@@ -28,6 +30,14 @@ def create_comparison(
     """
     from ..query_builder import parse_aggregation
     from ..core import execute_query
+    
+    # Parse display mode
+    try:
+        mode = DisplayMode.from_string(display_mode)
+    except ValueError as e:
+        if verbose:
+            print(f"Invalid display mode: {e}", file=sys.stderr)
+        mode = DisplayMode.FULL
     
     # Parse the aggregation function if provided
     if value_field:
@@ -82,6 +92,7 @@ def create_comparison(
         if verbose:
             print(f"Generated query: {data_query}", file=sys.stderr)
             print(f"Parameters: [{version_a}, {version_b}]", file=sys.stderr)
+            print(f"Display mode: {mode.name.lower()} - {mode.describe()}", file=sys.stderr)
         
         cursor.execute(data_query, (version_a, version_b))
         results = cursor.fetchall()
@@ -137,7 +148,7 @@ def create_comparison(
         a_width = max(a_width, len(a_header))
         b_width = max(b_width, len(b_header))
         
-        diff_width = 15  # For diff column
+        diff_width = mode.get_diff_column_width()  # Dynamic based on display mode
         
         # Build header
         header = " " * metric_width + " | " + a_header.ljust(a_width) + " | " + b_header.ljust(b_width) + " | diff"
@@ -159,7 +170,7 @@ def create_comparison(
             val_a_str = f"{val_a:.6g}" if isinstance(val_a, (int, float)) else str(val_a)
             val_b_str = f"{val_b:.6g}" if isinstance(val_b, (int, float)) else str(val_b)
             
-            # Calculate difference
+            # Calculate difference based on display mode
             try:
                 val_a_num = float(val_a)
                 val_b_num = float(val_b)
@@ -168,12 +179,24 @@ def create_comparison(
                 # Calculate percentage difference
                 if val_a_num != 0:
                     pct_diff = (diff / val_a_num) * 100
-                    diff_str = f"{diff:+.6g} ({pct_diff:+.1f}%)"
                 else:
-                    if diff == 0:
-                        diff_str = "0"
-                    else:
-                        diff_str = f"{diff:+.6g} (inf%)"
+                    pct_diff = float('inf') if diff != 0 else 0
+                
+                # Format based on display mode
+                if mode.should_show_value_in_diff_column():
+                    # For VALUE mode variants, show the B value instead of diff
+                    if mode == DisplayMode.VALUE:
+                        diff_str = val_b_str
+                    elif mode == DisplayMode.VALUE_DIFF:
+                        diff_str = f"{val_b_str} ({diff:+.6g})"
+                    else:  # VALUE_PERCENT
+                        if val_a_num == 0 and diff != 0:
+                            diff_str = f"{val_b_str} (inf%)"
+                        else:
+                            diff_str = f"{val_b_str} ({pct_diff:+.1f}%)"
+                else:
+                    # Use the display mode's formatting method
+                    diff_str = mode.format_diff_cell(diff, pct_diff, val_a_num)
             except (ValueError, TypeError):
                 diff_str = "N/A"
             

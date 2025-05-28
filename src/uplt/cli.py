@@ -11,6 +11,8 @@ def main():
         epilog='Examples:\n'
                '  SQL query: cat data.csv | uplt query "SELECT * FROM data"\n'
                '  SQL query (short): cat data.csv | uplt q "SELECT * FROM data"\n'
+               '  Add column: cat data.csv | uplt add "price * quantity as total"\n'
+               '  Add column (short): cat data.csv | uplt a "if(price > 100, 1, 0) as expensive"\n'
                '  Heatmap: cat data.csv | uplt heatmap x_field y_field "avg(value)"\n'
                '  Heatmap (short): cat data.csv | uplt hm x_field y_field "avg(value)"\n'
                '  Comparison (2+ versions): cat data.csv | uplt mcmp versions metrics "avg(value)"\n'
@@ -90,6 +92,7 @@ def main():
         # Note: 'cmp' and 'comparison' now both map to 'multi-comparison'
         command_aliases = {
             'q': 'query',
+            'a': 'add',
             'hm': 'heatmap',
             'cmp': 'multi-comparison',  # Deprecated: now maps to multi-comparison
             'comparison': 'multi-comparison',  # Deprecated: now maps to multi-comparison
@@ -110,6 +113,58 @@ def main():
             if results:
                 output = format_output(results, cursor.description)
                 print(output, end='')
+            elif args.verbose:
+                print("Query returned no results.", file=sys.stderr)
+        
+        elif command_type == "add":
+            # Add column mode
+            if len(args.command) < 2:
+                print("Error: Column expression required after 'add'", file=sys.stderr)
+                sys.exit(1)
+            
+            column_expr = args.command[1]
+            
+            # Get original column names
+            original_columns = headers
+            
+            # Build query to select all columns plus the new one
+            query = f"SELECT *, {column_expr} FROM {args.table_name}"
+            
+            if args.verbose:
+                print(f"Generated query: {query}", file=sys.stderr)
+            
+            results = execute_query(cursor, query)
+            
+            # Output results as CSV with headers
+            if results:
+                # Extract the new column name from the expression
+                # Look for "as column_name" pattern
+                import re
+                as_match = re.search(r'\s+as\s+(\w+)\s*$', column_expr, re.IGNORECASE)
+                if as_match:
+                    new_column_name = as_match.group(1)
+                else:
+                    # Default name if no alias provided
+                    new_column_name = f"expr_{len(original_columns)+1}"
+                
+                # Output headers
+                all_headers = original_columns + [new_column_name]
+                print(','.join(all_headers))
+                
+                # Output data
+                for row in results:
+                    # Format each value appropriately
+                    formatted_values = []
+                    for val in row:
+                        if val is None:
+                            formatted_values.append('')
+                        elif isinstance(val, str) and (',' in val or '"' in val or '\n' in val):
+                            # Escape quotes and wrap in quotes if needed
+                            escaped = val.replace('"', '""')
+                            formatted_values.append(f'"{escaped}"')
+                        else:
+                            formatted_values.append(str(val))
+                    print(','.join(formatted_values))
             elif args.verbose:
                 print("Query returned no results.", file=sys.stderr)
         

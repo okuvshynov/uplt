@@ -161,13 +161,12 @@ class TestComparison:
         )
         
         assert result is not None
-        # Check version labels
-        assert "A: A" in result
-        assert "B: B" in result
-        
-        # Check header
-        assert "A score" in result
-        assert "B score" in result
+        # With short names like A and B, they should be used directly
+        assert "| A score" in result
+        assert "| B score" in result
+        # Should NOT have letter label legend since names are short
+        assert "A: A" not in result
+        assert "B: B" not in result
         
         # Check values
         assert "10" in result  # A's score for 128
@@ -245,8 +244,12 @@ class TestComparison:
         )
         
         assert result is not None
-        assert "A: v1" in result
-        assert "B: v2" in result
+        # v1 and v2 are short enough to use directly
+        assert "| v1 count" in result
+        assert "| v2 count" in result
+        # Should NOT have letter label legend
+        assert "A: v1" not in result
+        assert "B: v2" not in result
         assert "small" in result
         assert "medium" in result
         assert "large" in result
@@ -312,8 +315,12 @@ class TestComparison:
         
         assert result is not None
         # Should compare A and B (first two alphabetically)
-        assert "A: A" in result
-        assert "B: B" in result
+        # With short names, they're used directly
+        assert "| A score" in result
+        assert "| B score" in result
+        # Should NOT have letter label legend
+        assert "A: A" not in result
+        assert "B: B" not in result
         assert "C:" not in result  # C should not appear
         
         # Check it still shows correct values for A and B
@@ -469,7 +476,12 @@ class TestChartsWithSQLiteFunctions:
         
         assert result is not None
         # Should extract a, b, c from model names
-        assert "Baseline (A): a" in result
+        # Since a, b, c are very short, they should be used directly
+        assert "| a " in result
+        assert "| b " in result
+        assert "| c " in result
+        # Should NOT have letter label legend
+        assert "Baseline (A): a" not in result
         
     def test_query_builder_with_sqlite_functions(self):
         """Test that query builder handles SQLite functions correctly."""
@@ -491,6 +503,149 @@ class TestChartsWithSQLiteFunctions:
         assert options["x_field"] == "substr(field1, 1, 3)"
         assert options["y_field"] == "UPPER(field2)"
         assert options["value_field"] == "avg(value)"
+
+
+class TestVersionLabeling:
+    """Test version labeling behavior in comparison charts."""
+    
+    def setup_method(self):
+        self.conn = sqlite3.connect(":memory:")
+        self.cursor = self.conn.cursor()
+        
+        # Create test table for short names
+        self.cursor.execute("""
+            CREATE TABLE short_names (
+                version TEXT,
+                metric TEXT,
+                value INTEGER
+            )
+        """)
+        
+        # Insert test data with short version names
+        short_data = [
+            ('v1', 'test1', 10),
+            ('v2', 'test1', 15),
+            ('v1', 'test2', 20),
+            ('v2', 'test2', 30),
+        ]
+        self.cursor.executemany("INSERT INTO short_names VALUES (?, ?, ?)", short_data)
+        
+        # Create test table for long names
+        self.cursor.execute("""
+            CREATE TABLE long_names (
+                version TEXT,
+                metric TEXT,
+                value INTEGER
+            )
+        """)
+        
+        # Insert test data with long version names
+        long_data = [
+            ('model_version_1', 'test1', 10),
+            ('model_version_2', 'test1', 15),
+            ('model_version_1', 'test2', 20),
+            ('model_version_2', 'test2', 30),
+        ]
+        self.cursor.executemany("INSERT INTO long_names VALUES (?, ?, ?)", long_data)
+        
+        # Create test table for multi-comparison
+        self.cursor.execute("""
+            CREATE TABLE multi_versions (
+                version TEXT,
+                metric TEXT,
+                value INTEGER
+            )
+        """)
+        
+        # Insert test data with multiple versions
+        multi_data = [
+            ('v1', 'test1', 10),
+            ('v2', 'test1', 15),
+            ('v3', 'test1', 12),
+            ('v1', 'test2', 20),
+            ('v2', 'test2', 30),
+            ('v3', 'test2', 25),
+        ]
+        self.cursor.executemany("INSERT INTO multi_versions VALUES (?, ?, ?)", multi_data)
+    
+    def teardown_method(self):
+        self.conn.close()
+    
+    def test_comparison_with_short_names(self):
+        """Test that short version names are used directly in comparison."""
+        from uplt.charts.comparison import create_comparison
+        result = create_comparison(
+            self.cursor, "version", "metric", "value", "short_names"
+        )
+        
+        assert result is not None
+        # Should use original names v1 and v2
+        assert "| v1 " in result
+        assert "| v2 " in result
+        # Should NOT have letter labels
+        assert "A: v1" not in result
+        assert "B: v2" not in result
+    
+    def test_comparison_with_long_names(self):
+        """Test that long version names use letter labels in comparison."""
+        from uplt.charts.comparison import create_comparison
+        result = create_comparison(
+            self.cursor, "version", "metric", "value", "long_names"
+        )
+        
+        assert result is not None
+        # Should have letter labels
+        assert "A: model_version_1" in result
+        assert "B: model_version_2" in result
+        # Should use A/B in table headers
+        assert "| A " in result
+        assert "| B " in result
+    
+    def test_multi_comparison_with_short_names(self):
+        """Test that short version names are used directly in multi-comparison."""
+        from uplt.charts.multi_comparison import create_multi_comparison
+        result = create_multi_comparison(
+            self.cursor, "version", "metric", "value", "multi_versions"
+        )
+        
+        assert result is not None
+        # Should use original names v1, v2, v3
+        assert "| v1 " in result
+        assert "| v2 " in result
+        assert "| v3 " in result
+        # Should NOT have letter labels
+        assert "Baseline (A):" not in result
+        assert "B: v2" not in result
+        assert "C: v3" not in result
+    
+    def test_multi_comparison_with_mixed_lengths(self):
+        """Test multi-comparison with mixed name lengths."""
+        # Create table with mixed length names
+        self.cursor.execute("""
+            CREATE TABLE mixed_names (
+                version TEXT,
+                metric TEXT,
+                value INTEGER
+            )
+        """)
+        
+        mixed_data = [
+            ('v1', 'test1', 10),
+            ('model_long_name', 'test1', 15),
+            ('v3', 'test1', 12),
+        ]
+        self.cursor.executemany("INSERT INTO mixed_names VALUES (?, ?, ?)", mixed_data)
+        
+        from uplt.charts.multi_comparison import create_multi_comparison
+        result = create_multi_comparison(
+            self.cursor, "version", "metric", "value", "mixed_names"
+        )
+        
+        assert result is not None
+        # Should use letter labels because one name is too long
+        assert "Baseline (A):" in result
+        assert "B:" in result
+        assert "C:" in result
 
 
 class TestChartsWithArithmeticExpressions:

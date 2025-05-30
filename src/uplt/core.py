@@ -5,6 +5,41 @@ import re
 from typing import List, Any, Optional, Tuple
 
 
+def parse_field_with_alias(field_expr: str) -> Tuple[str, Optional[str]]:
+    """Parse a field expression that may contain an AS alias.
+    
+    Examples:
+        "column" -> ("column", None)
+        "column as alias" -> ("column", "alias")
+        "substr(col, 1, 5) as prefix" -> ("substr(col, 1, 5)", "prefix")
+        "UPPER(name) AS NAME" -> ("UPPER(name)", "NAME")
+    
+    Returns:
+        Tuple of (expression, alias) where alias is None if not specified
+    """
+    # Case-insensitive match for ' as ' or ' AS '
+    # Use negative lookbehind to avoid matching 'as' within function names
+    as_pattern = re.compile(r'\s+[aA][sS]\s+', re.IGNORECASE)
+    
+    # Find the last occurrence of ' as ' to handle cases where AS might appear in the expression
+    matches = list(as_pattern.finditer(field_expr))
+    
+    if matches:
+        # Use the last match to split
+        last_match = matches[-1]
+        expression = field_expr[:last_match.start()].strip()
+        alias = field_expr[last_match.end():].strip()
+        
+        # Remove quotes from alias if present
+        if alias and len(alias) >= 2:
+            if (alias[0] == '"' and alias[-1] == '"') or (alias[0] == "'" and alias[-1] == "'"):
+                alias = alias[1:-1]
+        
+        return (expression, alias)
+    
+    return (field_expr.strip(), None)
+
+
 def detect_delimiter(sample: str) -> str:
     """Detect the most likely delimiter in the CSV data."""
     delimiters = [',', ';', '\t', ' ', '|']

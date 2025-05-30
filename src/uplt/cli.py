@@ -1,7 +1,7 @@
 import sys
 import sqlite3
 import argparse
-from .core import create_table_from_csv, execute_query, format_output
+from .core import create_table_from_csv, execute_query, format_output, parse_field_with_alias
 from .query_builder import parse_chart_command
 
 
@@ -218,7 +218,18 @@ def main():
                 sys.exit(1)
             
             # Parse group by fields (comma-separated)
-            groupby_fields = [f.strip() for f in args.command[1].split(',')]
+            raw_groupby_fields = [f.strip() for f in args.command[1].split(',')]
+            
+            # Parse each field for potential aliases
+            groupby_fields = []
+            groupby_expressions = []
+            for field in raw_groupby_fields:
+                expr, alias = parse_field_with_alias(field)
+                groupby_expressions.append(expr)
+                if alias:
+                    groupby_fields.append(f"{expr} as {alias}")
+                else:
+                    groupby_fields.append(expr)
             
             # Parse aggregations if provided
             if len(args.command) >= 3:
@@ -232,7 +243,7 @@ def main():
                     # Find numeric columns (excluding groupby fields)
                     numeric_columns = []
                     for col in headers:
-                        if col not in groupby_fields:
+                        if col not in groupby_expressions:
                             # Check if column has numeric values
                             check_query = f"SELECT {col} FROM {args.table_name} WHERE {col} IS NOT NULL LIMIT 10"
                             sample_results = execute_query(cursor, check_query)
@@ -256,7 +267,15 @@ def main():
                     agg_expressions = [f"{agg_func}({col}) as {col}_{agg_func}" for col in numeric_columns]
                 else:
                     # Full syntax: parse comma-separated aggregation expressions
-                    agg_expressions = [expr.strip() for expr in agg_spec.split(',')]
+                    raw_agg_expressions = [expr.strip() for expr in agg_spec.split(',')]
+                    # Parse each aggregation expression for potential aliases
+                    agg_expressions = []
+                    for agg_expr in raw_agg_expressions:
+                        expr, alias = parse_field_with_alias(agg_expr)
+                        if alias:
+                            agg_expressions.append(f"{expr} as {alias}")
+                        else:
+                            agg_expressions.append(expr)
             else:
                 # No aggregation specified - default to avg on all numeric columns
                 agg_func = 'avg'
@@ -264,7 +283,7 @@ def main():
                 # Find numeric columns (excluding groupby fields)
                 numeric_columns = []
                 for col in headers:
-                    if col not in groupby_fields:
+                    if col not in groupby_expressions:
                         # Check if column has numeric values
                         check_query = f"SELECT {col} FROM {args.table_name} WHERE {col} IS NOT NULL LIMIT 10"
                         sample_results = execute_query(cursor, check_query)
@@ -289,7 +308,7 @@ def main():
             
             # Build the GROUP BY query
             select_parts = groupby_fields + agg_expressions
-            query = f"SELECT {', '.join(select_parts)} FROM {args.table_name} GROUP BY {', '.join(groupby_fields)} ORDER BY {', '.join(groupby_fields)}"
+            query = f"SELECT {', '.join(select_parts)} FROM {args.table_name} GROUP BY {', '.join(groupby_expressions)} ORDER BY {', '.join(groupby_expressions)}"
             
             if args.verbose:
                 print(f"Generated query: {query}", file=sys.stderr)

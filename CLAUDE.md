@@ -173,6 +173,19 @@ cat data.csv | uplt groupby category        # Same as: uplt g category avg
 cat logs.csv | uplt groupby "substr(timestamp,1,10),status" "count(*)"
 cat sales.csv | uplt groupby "UPPER(region)" "sum(amount)"
 
+# Column aliasing with AS syntax
+cat requests.csv | uplt groupby "substr(timestamp,1,8) as day,model_version" "count(*) as requests,sum(error) as errors"
+cat logs.csv | uplt groupby "substr(timestamp,1,10) as date,upper(status) as STATUS" "count(*) as total"
+
+# Alias support for complex expressions
+cat data.csv | uplt groupby "substr(endpoint,-7) as api_version,model as model_name" "avg(latency_ms) as avg_latency"
+
+# Mixing aliased and non-aliased columns
+cat data.csv | uplt groupby "upper(region) as REGION,category" "sum(revenue)"
+
+# Aliases work with aggregate shortcuts too
+cat data.csv | uplt groupby "substr(date,1,7) as month" sum
+
 # Groupby pipelines
 cat orders.csv | \
   uplt filter "year = 2024" | \
@@ -366,6 +379,7 @@ cat data.csv | uplt -v mcmp models metrics value
 - **Baseline selection**: Choose baseline for multi-comparison with `--baseline` or `-b` flag
 - **Simplified comparison layout**: Merged value and difference columns for more concise output
 - **SQLite function support**: Use any SQLite function in field arguments for dynamic data transformation
+- **Column aliasing in groupby**: Use SQL-style `AS` syntax to rename columns in groupby operations
 
 ## Future Enhancements
 - Add more chart types (bar charts, line charts, scatter plots)

@@ -172,3 +172,98 @@ class TestGroupByCommand:
         # So avg for A is (10+0+20)/3 = 10
         assert "A,10" in output or "A,10.0" in output
         assert "B,35" in output or "B,35.0" in output
+    
+    def test_groupby_with_alias(self):
+        """Test groupby with AS aliases for columns."""
+        csv_data = "timestamp,category,value\n20240101_120000,Electronics,100\n20240101_130000,Electronics,150\n20240102_140000,Clothing,50"
+        
+        # Run uplt groupby with aliased fields
+        proc = subprocess.run(
+            [sys.executable, "-m", "uplt", "groupby", "substr(timestamp,1,8) as day,category", "sum(value) as total"],
+            input=csv_data,
+            capture_output=True,
+            text=True
+        )
+        
+        assert proc.returncode == 0
+        output = proc.stdout.strip()
+        lines = output.splitlines()
+        
+        # Check headers with aliases
+        assert "day,category,total" in lines[0]
+        
+        # Check data
+        assert "20240101,Electronics,250" in output
+        assert "20240102,Clothing,50" in output
+    
+    def test_groupby_multiple_aliases(self):
+        """Test groupby with multiple aliased fields and aggregations."""
+        csv_data = "endpoint,model,latency,errors\n/api/v1/predict,test1,100,0\n/api/v1/predict,test1,150,1\n/api/v2/predict,test2,80,0"
+        
+        # Run uplt groupby with multiple aliases
+        proc = subprocess.run(
+            [sys.executable, "-m", "uplt", "groupby", 
+             "substr(endpoint,-7) as api_version,model as model_name", 
+             "avg(latency) as avg_latency,sum(errors) as total_errors"],
+            input=csv_data,
+            capture_output=True,
+            text=True
+        )
+        
+        assert proc.returncode == 0
+        output = proc.stdout.strip()
+        lines = output.splitlines()
+        
+        # Check aliased headers
+        assert "api_version,model_name,avg_latency,total_errors" in lines[0]
+        
+        # Check data
+        assert "predict,test1,125" in output or "predict,test1,125.0" in output
+        assert "predict,test1" in output and ",1" in output
+        assert "predict,test2,80" in output or "predict,test2,80.0" in output
+    
+    def test_groupby_alias_with_shortcut(self):
+        """Test groupby with aliases and aggregate-all shortcuts."""
+        csv_data = "date,store_id,sales,returns\n2024-01-01,S001,1000,50\n2024-01-01,S002,1500,75\n2024-01-02,S001,1200,60"
+        
+        # Run uplt groupby with alias and sum shortcut
+        proc = subprocess.run(
+            [sys.executable, "-m", "uplt", "groupby", "substr(date,1,7) as month", "sum"],
+            input=csv_data,
+            capture_output=True,
+            text=True
+        )
+        
+        assert proc.returncode == 0
+        output = proc.stdout.strip()
+        lines = output.splitlines()
+        
+        # Check headers - month alias should be used
+        assert "month,sales_sum,returns_sum" in lines[0]
+        
+        # Check aggregated data
+        assert "2024-01,3700,185" in output
+    
+    def test_groupby_mixed_alias_no_alias(self):
+        """Test groupby with mix of aliased and non-aliased fields."""
+        csv_data = "region,category,revenue\nNorth,Electronics,1000\nNorth,Clothing,500\nSouth,Electronics,1500"
+        
+        # Run uplt groupby with one aliased field
+        proc = subprocess.run(
+            [sys.executable, "-m", "uplt", "groupby", "upper(region) as REGION,category", "sum(revenue)"],
+            input=csv_data,
+            capture_output=True,
+            text=True
+        )
+        
+        assert proc.returncode == 0
+        output = proc.stdout.strip()
+        lines = output.splitlines()
+        
+        # Check headers
+        assert "REGION,category,sum(revenue)" in lines[0]
+        
+        # Check transformed data
+        assert "NORTH,Electronics,1000" in output
+        assert "NORTH,Clothing,500" in output
+        assert "SOUTH,Electronics,1500" in output

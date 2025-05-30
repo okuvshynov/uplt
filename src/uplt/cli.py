@@ -13,6 +13,8 @@ def main():
                '  SQL query (short): cat data.csv | uplt q "SELECT * FROM data"\n'
                '  Add column: cat data.csv | uplt add "price * quantity as total"\n'
                '  Add column (short): cat data.csv | uplt a "if(price > 100, 1, 0) as expensive"\n'
+               '  Filter rows: cat data.csv | uplt filter "price > 100"\n'
+               '  Filter rows (short): cat data.csv | uplt f "status = \'active\'"\n'
                '  Heatmap: cat data.csv | uplt heatmap x_field y_field "avg(value)"\n'
                '  Heatmap (short): cat data.csv | uplt hm x_field y_field "avg(value)"\n'
                '  Comparison (2+ versions): cat data.csv | uplt mcmp versions metrics "avg(value)"\n'
@@ -93,6 +95,7 @@ def main():
         command_aliases = {
             'q': 'query',
             'a': 'add',
+            'f': 'filter',
             'hm': 'heatmap',
             'cmp': 'multi-comparison',  # Deprecated: now maps to multi-comparison
             'comparison': 'multi-comparison',  # Deprecated: now maps to multi-comparison
@@ -167,6 +170,43 @@ def main():
                     print(','.join(formatted_values))
             elif args.verbose:
                 print("Query returned no results.", file=sys.stderr)
+        
+        elif command_type == "filter":
+            # Filter rows mode
+            if len(args.command) < 2:
+                print("Error: Filter expression required after 'filter'", file=sys.stderr)
+                sys.exit(1)
+            
+            filter_expr = args.command[1]
+            
+            # Build query to select all rows that match the filter
+            query = f"SELECT * FROM {args.table_name} WHERE {filter_expr}"
+            
+            if args.verbose:
+                print(f"Generated query: {query}", file=sys.stderr)
+            
+            results = execute_query(cursor, query)
+            
+            # Always output headers for filter command
+            print(','.join(headers))
+            
+            # Output data if any results
+            if results:
+                for row in results:
+                    # Format each value appropriately
+                    formatted_values = []
+                    for val in row:
+                        if val is None:
+                            formatted_values.append('')
+                        elif isinstance(val, str) and (',' in val or '"' in val or '\n' in val):
+                            # Escape quotes and wrap in quotes if needed
+                            escaped = val.replace('"', '""')
+                            formatted_values.append(f'"{escaped}"')
+                        else:
+                            formatted_values.append(str(val))
+                    print(','.join(formatted_values))
+            elif args.verbose:
+                print("Filter returned no matching rows.", file=sys.stderr)
         
         else:
             # Chart mode

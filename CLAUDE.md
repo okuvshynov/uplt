@@ -116,6 +116,39 @@ cat sales.csv | \
   uplt query "SELECT category, SUM(grand_total) FROM data GROUP BY category"
 ```
 
+### Filter Mode
+```bash
+# Filter rows based on conditions
+cat data.csv | uplt filter "price > 100"
+# Short form
+cat data.csv | uplt f "status = 'active'"
+
+# Complex conditions
+cat data.csv | uplt filter "price > 100 AND quantity < 50"
+cat data.csv | uplt filter "category IN ('electronics', 'computers')"
+cat data.csv | uplt filter "name LIKE '%laptop%'"
+
+# Using SQLite functions in conditions
+cat data.csv | uplt filter "UPPER(category) = 'ELECTRONICS'"
+cat data.csv | uplt filter "LENGTH(name) > 10"
+cat data.csv | uplt filter "substr(date, 1, 4) = '2024'"
+
+# Filter with headerless data
+echo -e "laptop,1000,5\nmouse,50,100" | uplt filter "f2 > 100"
+
+# Chaining with other commands
+cat products.csv | \
+  uplt filter "price > 50" | \
+  uplt add "price * 0.1 as discount" | \
+  uplt filter "discount > 10" | \
+  uplt query "SELECT * FROM data ORDER BY discount DESC"
+
+# Common use cases
+cat logs.csv | uplt filter "status = 'ERROR'"  # Get error logs
+cat sales.csv | uplt filter "date >= '2024-01-01'"  # Recent sales
+cat inventory.csv | uplt filter "quantity = 0"  # Out of stock items
+```
+
 ### Chart Mode (Heatmap)
 ```bash
 # Count occurrences
@@ -284,10 +317,11 @@ cat data.csv | uplt -v mcmp models metrics value
 - Consolidated chart rendering logic
 
 ### Feature Improvements
+- **New filter command**: Filter rows with WHERE conditions using `filter` or `f` command for easy data subsetting
 - **New add command**: Add computed columns to CSV data with `add` or `a` command for easy data transformation and piping
 - **Unified comparison mode**: Both `cmp` and `mcmp` now use multi-comparison, supporting any number of versions (2+)
 - **Deprecated comparison chart**: The separate comparison mode has been deprecated in favor of unified multi-comparison
-- **Short command aliases**: Use `q` for `query`, `hm` for `heatmap`, `cmp` for `comparison`, and `mcmp` for `multi-comparison`
+- **Short command aliases**: Use `q` for `query`, `a` for `add`, `f` for `filter`, `hm` for `heatmap`, `cmp` for `comparison`, and `mcmp` for `multi-comparison`
 - **Verbose mode**: Added `-v`/`--verbose` flag to display generated SQL queries and data points
 - **Automatic header detection**: Intelligently determines if CSV has headers (PR #6)
 - **Enhanced heatmap legend**: Shows exact value ranges for each character (PR #5)

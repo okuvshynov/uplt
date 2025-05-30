@@ -16,10 +16,11 @@ uv pip install uplt
 
 ## Usage
 
-uplt supports three modes:
+uplt supports four modes:
 1. **SQL Query Mode**: Execute raw SQL queries on CSV data
 2. **Add Column Mode**: Add computed columns to CSV data for piping
-3. **Chart Mode**: Create terminal-based charts from CSV data (heatmaps, comparisons)
+3. **Filter Mode**: Filter rows based on WHERE conditions
+4. **Chart Mode**: Create terminal-based charts from CSV data (heatmaps, comparisons)
 
 ### SQL Query Mode
 
@@ -45,6 +46,27 @@ cat data.csv | uplt add "lower(name) as name_lower"
 
 # Chain with other commands
 cat latency.csv | uplt add "if(n_items > 1000, 1, 0) as large_query" | uplt cmp version large_query latency_ms
+```
+
+### Filter Mode
+
+Filter rows based on WHERE conditions:
+
+```bash
+# Simple filtering
+cat data.csv | uplt filter "price > 100"
+
+# Complex conditions
+cat data.csv | uplt filter "price > 100 AND quantity < 50"
+
+# String comparisons
+cat data.csv | uplt filter "status = 'active'"
+
+# Use SQLite functions
+cat data.csv | uplt filter "UPPER(category) = 'ELECTRONICS'"
+
+# Chain with other commands
+cat data.csv | uplt filter "price > 50" | uplt add "price * 0.1 as discount"
 ```
 
 ### Chart Mode
@@ -144,6 +166,45 @@ cat data.csv | uplt heatmap category "CASE WHEN price < 50 THEN 'low' ELSE 'high
 
 # Combine multiple functions
 cat data.csv | uplt cmp "UPPER(substr(model, 1, 3))" metric value
+```
+
+### Filtering Data
+
+#### Basic filtering
+```bash
+# Filter rows by condition
+cat products.csv | uplt filter "price > 100"
+
+# With multiple conditions
+cat products.csv | uplt filter "price > 100 AND quantity > 0"
+
+# String comparisons
+cat logs.csv | uplt filter "status = 'ERROR'"
+cat users.csv | uplt filter "country IN ('US', 'CA', 'MX')"
+```
+
+#### Using SQLite functions
+```bash
+# Case-insensitive filtering
+cat products.csv | uplt filter "LOWER(category) = 'electronics'"
+
+# Date filtering
+cat logs.csv | uplt filter "substr(timestamp, 1, 10) = '2024-01-15'"
+
+# Pattern matching
+cat users.csv | uplt filter "email LIKE '%@gmail.com'"
+```
+
+#### Filtering pipelines
+```bash
+# Filter then aggregate
+cat sales.csv | uplt filter "date >= '2024-01-01'" | uplt query "SELECT SUM(amount) FROM data"
+
+# Filter, transform, then chart
+cat performance.csv | uplt filter "response_time > 100" | uplt add "if(response_time > 1000, 'slow', 'normal') as speed" | uplt heatmap server speed "count(*)"
+
+# Multi-step filtering
+cat products.csv | uplt filter "price > 50" | uplt add "price * 0.1 as discount" | uplt filter "discount > 10"
 ```
 
 ### Charts
@@ -247,6 +308,7 @@ By default, uplt automatically detects whether the first row contains headers by
 For convenience, uplt provides short aliases for common commands:
 - `q` → `query`
 - `a` → `add`
+- `f` → `filter`
 - `hm` → `heatmap`
 - `cmp` → `mcmp` (comparison, works with 2+ versions)
 - `mcmp` → `multi-comparison` (explicit multi-comparison command)
@@ -255,6 +317,7 @@ Example:
 ```bash
 cat data.csv | uplt q "SELECT * FROM data"
 cat data.csv | uplt a "price * 0.1 as tax"
+cat data.csv | uplt f "price > 100"
 cat data.csv | uplt hm x_field y_field
 cat data.csv | uplt cmp version metric value  # Works with any number of versions
 ```

@@ -199,8 +199,8 @@ def format_output(results: List[Tuple], description: List[Tuple]) -> str:
     if not results:
         return ""
     
-    output = io.StringIO()
-    writer = csv.writer(output)
+    output = io.StringIO(newline='')
+    writer = csv.writer(output, lineterminator='\n')
     
     # Write headers
     headers = [desc[0] for desc in description]

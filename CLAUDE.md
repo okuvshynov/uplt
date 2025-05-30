@@ -149,6 +149,40 @@ cat sales.csv | uplt filter "date >= '2024-01-01'"  # Recent sales
 cat inventory.csv | uplt filter "quantity = 0"  # Out of stock items
 ```
 
+### Group By Mode
+```bash
+# Full syntax with specific aggregations
+cat data.csv | uplt groupby "category,region" "sum(sales),avg(price),count(*)"
+# Short form
+cat data.csv | uplt g category "sum(revenue)"
+
+# Group by multiple fields
+cat data.csv | uplt groupby "store,month" "sum(sales),avg(customers)"
+
+# Aggregate-all shortcuts (apply same function to all numeric columns)
+cat data.csv | uplt groupby category sum    # Sum all numeric columns
+cat data.csv | uplt groupby category avg    # Average all numeric columns
+cat data.csv | uplt groupby category min    # Min of all numeric columns
+cat data.csv | uplt groupby category max    # Max of all numeric columns
+cat data.csv | uplt groupby category count  # Count all numeric columns
+
+# Default behavior (no aggregation specified = avg)
+cat data.csv | uplt groupby category        # Same as: uplt g category avg
+
+# Complex grouping with SQLite functions
+cat logs.csv | uplt groupby "substr(timestamp,1,10),status" "count(*)"
+cat sales.csv | uplt groupby "UPPER(region)" "sum(amount)"
+
+# Groupby pipelines
+cat orders.csv | \
+  uplt filter "year = 2024" | \
+  uplt groupby "customer_id,quarter" "sum(total),count(*) as orders" | \
+  uplt filter "orders > 10"
+
+# Verbose mode shows SQL and numeric columns detected
+cat data.csv | uplt -v groupby category sum
+```
+
 ### Chart Mode (Heatmap)
 ```bash
 # Count occurrences
@@ -317,11 +351,12 @@ cat data.csv | uplt -v mcmp models metrics value
 - Consolidated chart rendering logic
 
 ### Feature Improvements
+- **New groupby command**: Group and aggregate data with `groupby` or `g` command with flexible syntax
 - **New filter command**: Filter rows with WHERE conditions using `filter` or `f` command for easy data subsetting
 - **New add command**: Add computed columns to CSV data with `add` or `a` command for easy data transformation and piping
 - **Unified comparison mode**: Both `cmp` and `mcmp` now use multi-comparison, supporting any number of versions (2+)
 - **Deprecated comparison chart**: The separate comparison mode has been deprecated in favor of unified multi-comparison
-- **Short command aliases**: Use `q` for `query`, `a` for `add`, `f` for `filter`, `hm` for `heatmap`, `cmp` for `comparison`, and `mcmp` for `multi-comparison`
+- **Short command aliases**: Use `q` for `query`, `a` for `add`, `f` for `filter`, `g` for `groupby`, `hm` for `heatmap`, `cmp` for `comparison`, and `mcmp` for `multi-comparison`
 - **Verbose mode**: Added `-v`/`--verbose` flag to display generated SQL queries and data points
 - **Automatic header detection**: Intelligently determines if CSV has headers (PR #6)
 - **Enhanced heatmap legend**: Shows exact value ranges for each character (PR #5)

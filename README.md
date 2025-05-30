@@ -16,11 +16,12 @@ uv pip install uplt
 
 ## Usage
 
-uplt supports four modes:
+uplt supports five modes:
 1. **SQL Query Mode**: Execute raw SQL queries on CSV data
 2. **Add Column Mode**: Add computed columns to CSV data for piping
 3. **Filter Mode**: Filter rows based on WHERE conditions
-4. **Chart Mode**: Create terminal-based charts from CSV data (heatmaps, comparisons)
+4. **Group By Mode**: Aggregate data by one or more fields
+5. **Chart Mode**: Create terminal-based charts from CSV data (heatmaps, comparisons)
 
 ### SQL Query Mode
 
@@ -67,6 +68,26 @@ cat data.csv | uplt filter "UPPER(category) = 'ELECTRONICS'"
 
 # Chain with other commands
 cat data.csv | uplt filter "price > 50" | uplt add "price * 0.1 as discount"
+```
+
+### Group By Mode
+
+Aggregate data with flexible syntax:
+
+```bash
+# Full syntax with specific aggregations
+cat data.csv | uplt groupby "category,region" "sum(sales),avg(price)"
+
+# Shortcut: apply same function to all numeric columns
+cat data.csv | uplt groupby category sum
+cat data.csv | uplt groupby category avg
+cat data.csv | uplt groupby category min
+
+# Default: averages all numeric columns
+cat data.csv | uplt groupby category
+
+# Short alias
+cat data.csv | uplt g category sum
 ```
 
 ### Chart Mode
@@ -207,6 +228,49 @@ cat performance.csv | uplt filter "response_time > 100" | uplt add "if(response_
 cat products.csv | uplt filter "price > 50" | uplt add "price * 0.1 as discount" | uplt filter "discount > 10"
 ```
 
+### Grouping and Aggregation
+
+#### Basic groupby
+```bash
+# Group by single field with specific aggregations
+cat sales.csv | uplt groupby region "sum(sales),avg(price)"
+
+# Group by multiple fields
+cat sales.csv | uplt groupby "category,region" "sum(sales),count(*)"
+
+# Using SQLite aggregate functions
+cat data.csv | uplt groupby category "min(price),max(price),avg(price)"
+```
+
+#### Aggregate-all shortcuts
+```bash
+# Apply same function to all numeric columns
+cat sales.csv | uplt groupby region sum    # Sums all numeric columns
+cat sales.csv | uplt groupby region avg    # Averages all numeric columns
+cat sales.csv | uplt groupby region min    # Finds minimum of all numeric columns
+cat sales.csv | uplt groupby region max    # Finds maximum of all numeric columns
+cat sales.csv | uplt groupby region count  # Counts all numeric columns
+
+# Default behavior (no function specified = avg)
+cat sales.csv | uplt groupby region        # Same as: uplt groupby region avg
+```
+
+#### Groupby pipelines
+```bash
+# Filter, then group
+cat sales.csv | uplt filter "date >= '2024-01-01'" | uplt groupby category "sum(revenue)"
+
+# Group, then filter results
+cat sales.csv | uplt groupby store "sum(sales)" | uplt filter "sum(sales) > 10000"
+
+# Complex analysis pipeline
+cat orders.csv | \
+  uplt filter "status = 'completed'" | \
+  uplt add "quantity * unit_price as total" | \
+  uplt groupby "customer_id,month" "sum(total),count(*) as order_count" | \
+  uplt filter "order_count >= 5"
+```
+
 ### Charts
 
 #### Basic heatmap (counts occurrences)
@@ -309,6 +373,7 @@ For convenience, uplt provides short aliases for common commands:
 - `q` → `query`
 - `a` → `add`
 - `f` → `filter`
+- `g` → `groupby`
 - `hm` → `heatmap`
 - `cmp` → `mcmp` (comparison, works with 2+ versions)
 - `mcmp` → `multi-comparison` (explicit multi-comparison command)
@@ -318,6 +383,7 @@ Example:
 cat data.csv | uplt q "SELECT * FROM data"
 cat data.csv | uplt a "price * 0.1 as tax"
 cat data.csv | uplt f "price > 100"
+cat data.csv | uplt g category sum
 cat data.csv | uplt hm x_field y_field
 cat data.csv | uplt cmp version metric value  # Works with any number of versions
 ```

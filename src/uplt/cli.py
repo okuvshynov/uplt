@@ -15,6 +15,8 @@ def main():
                '  Add column (short): cat data.csv | uplt a "if(price > 100, 1, 0) as expensive"\n'
                '  Filter rows: cat data.csv | uplt filter "price > 100"\n'
                '  Filter rows (short): cat data.csv | uplt f "status = \'active\'"\n'
+               '  Group by: cat data.csv | uplt groupby "category,region" "avg(price),sum(quantity)"\n'
+               '  Group by (short): cat data.csv | uplt g category avg\n'
                '  Heatmap: cat data.csv | uplt heatmap x_field y_field "avg(value)"\n'
                '  Heatmap (short): cat data.csv | uplt hm x_field y_field "avg(value)"\n'
                '  Comparison (2+ versions): cat data.csv | uplt mcmp versions metrics "avg(value)"\n'
@@ -96,6 +98,7 @@ def main():
             'q': 'query',
             'a': 'add',
             'f': 'filter',
+            'g': 'groupby',
             'hm': 'heatmap',
             'cmp': 'multi-comparison',  # Deprecated: now maps to multi-comparison
             'comparison': 'multi-comparison',  # Deprecated: now maps to multi-comparison
@@ -207,6 +210,99 @@ def main():
                     print(','.join(formatted_values))
             elif args.verbose:
                 print("Filter returned no matching rows.", file=sys.stderr)
+        
+        elif command_type == "groupby":
+            # Group by mode
+            if len(args.command) < 2:
+                print("Error: Group by fields required after 'groupby'", file=sys.stderr)
+                sys.exit(1)
+            
+            # Parse group by fields (comma-separated)
+            groupby_fields = [f.strip() for f in args.command[1].split(',')]
+            
+            # Parse aggregations if provided
+            if len(args.command) >= 3:
+                agg_spec = args.command[2]
+                
+                # Check if it's a shortcut (single function name like 'avg', 'sum', etc.)
+                if agg_spec.lower() in ['avg', 'sum', 'min', 'max', 'count']:
+                    # Aggregate all numeric columns with the same function
+                    agg_func = agg_spec.lower()
+                    
+                    # Find numeric columns (excluding groupby fields)
+                    numeric_columns = []
+                    for col in headers:
+                        if col not in groupby_fields:
+                            # Check if column has numeric values
+                            check_query = f"SELECT {col} FROM {args.table_name} WHERE {col} IS NOT NULL LIMIT 10"
+                            sample_results = execute_query(cursor, check_query)
+                            if sample_results:
+                                # Check if values are numeric
+                                is_numeric = True
+                                for row in sample_results:
+                                    try:
+                                        float(row[0])
+                                    except (ValueError, TypeError):
+                                        is_numeric = False
+                                        break
+                                if is_numeric:
+                                    numeric_columns.append(col)
+                    
+                    if not numeric_columns:
+                        print("Error: No numeric columns found to aggregate", file=sys.stderr)
+                        sys.exit(1)
+                    
+                    # Build aggregation expressions
+                    agg_expressions = [f"{agg_func}({col}) as {col}_{agg_func}" for col in numeric_columns]
+                else:
+                    # Full syntax: parse comma-separated aggregation expressions
+                    agg_expressions = [expr.strip() for expr in agg_spec.split(',')]
+            else:
+                # No aggregation specified - default to avg on all numeric columns
+                agg_func = 'avg'
+                
+                # Find numeric columns (excluding groupby fields)
+                numeric_columns = []
+                for col in headers:
+                    if col not in groupby_fields:
+                        # Check if column has numeric values
+                        check_query = f"SELECT {col} FROM {args.table_name} WHERE {col} IS NOT NULL LIMIT 10"
+                        sample_results = execute_query(cursor, check_query)
+                        if sample_results:
+                            # Check if values are numeric
+                            is_numeric = True
+                            for row in sample_results:
+                                try:
+                                    float(row[0])
+                                except (ValueError, TypeError):
+                                    is_numeric = False
+                                    break
+                            if is_numeric:
+                                numeric_columns.append(col)
+                
+                if not numeric_columns:
+                    print("Error: No numeric columns found to aggregate", file=sys.stderr)
+                    sys.exit(1)
+                
+                # Build aggregation expressions
+                agg_expressions = [f"{agg_func}({col}) as {col}_{agg_func}" for col in numeric_columns]
+            
+            # Build the GROUP BY query
+            select_parts = groupby_fields + agg_expressions
+            query = f"SELECT {', '.join(select_parts)} FROM {args.table_name} GROUP BY {', '.join(groupby_fields)} ORDER BY {', '.join(groupby_fields)}"
+            
+            if args.verbose:
+                print(f"Generated query: {query}", file=sys.stderr)
+                print(f"Numeric columns found: {', '.join(numeric_columns) if 'numeric_columns' in locals() else 'N/A'}", file=sys.stderr)
+            
+            results = execute_query(cursor, query)
+            
+            # Output results as CSV
+            if results:
+                output = format_output(results, cursor.description)
+                print(output, end='')
+            elif args.verbose:
+                print("Query returned no results.", file=sys.stderr)
         
         else:
             # Chart mode

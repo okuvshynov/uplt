@@ -96,14 +96,23 @@ cat data.csv | uplt add "price * quantity as total"
 # Short form
 cat data.csv | uplt a "price * 0.1 as tax"
 
+# Multiple columns in one command (comma-separated)
+cat data.csv | uplt add "price * quantity as total, price * 0.1 as tax"
+
 # Conditional columns
 cat data.csv | uplt add "case when price > 100 then 'expensive' else 'cheap' end as category"
 cat data.csv | uplt add "if(status = 'active', 1, 0) as is_active"
+
+# Functions with commas (properly parsed)
+cat data.csv | uplt add "IIF(price > 100, 'expensive', 'cheap') as category, substr(name, 1, 3) as prefix"
 
 # Using SQLite functions
 cat data.csv | uplt add "lower(name) as name_lower"
 cat data.csv | uplt add "substr(date, 1, 7) as month"
 cat data.csv | uplt add "round(price, 2) as price_rounded"
+
+# Complex expressions with nested functions
+cat data.csv | uplt add "UPPER(TRIM(description)) as clean_desc, LENGTH(TRIM(name)) as name_len"
 
 # Chaining with other commands
 cat latency.csv | uplt add "if(n_items > 1000, 1, 0) as large_query" | uplt cmp version large_query latency_ms
@@ -357,6 +366,11 @@ cat data.csv | uplt -v mcmp models metrics value
 - **Header Detection Implementation**: See `auto_detect_headers()` in `core.py`
 
 ## Recent Changes (2025)
+
+### Bug Fixes
+- **Fixed comma parsing in complex expressions**: Both `add` and `groupby` commands now properly handle comma-separated expressions containing functions with commas (e.g., `IIF(condition, 'yes', 'no'), other_field`)
+- **Added robust expression parser**: New `split_expressions()` function correctly splits expressions while respecting parentheses and quotes
+- **Comprehensive test coverage**: Added 22 tests for expression parsing and 20+ tests for complex add/groupby operations
 
 ### Major Refactoring
 - **PR #9 & #8**: Significant codebase cleanup removing ~800 lines of unused/duplicate code

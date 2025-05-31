@@ -39,11 +39,20 @@ Add computed columns to your CSV data:
 # Add a calculated column
 cat data.csv | uplt add "price * quantity as total"
 
+# Add multiple columns in one command
+cat data.csv | uplt add "price * quantity as total, price * 0.1 as tax"
+
+# Functions with commas are properly parsed
+cat data.csv | uplt add "IIF(price > 100, 'expensive', 'cheap') as category, substr(name, 1, 3) as prefix"
+
 # Add a conditional column
 cat data.csv | uplt add "case when price > 100 then 'expensive' else 'cheap' end as category"
 
 # Use SQLite functions
 cat data.csv | uplt add "lower(name) as name_lower"
+
+# Complex expressions with nested functions
+cat data.csv | uplt add "UPPER(TRIM(description)) as clean_desc, LENGTH(TRIM(name)) as name_len"
 
 # Chain with other commands
 cat latency.csv | uplt add "if(n_items > 1000, 1, 0) as large_query" | uplt cmp version large_query latency_ms
@@ -145,6 +154,9 @@ cat sales.csv | uplt add "price * quantity as total"
 
 # Add multiple columns by chaining
 cat sales.csv | uplt add "price * quantity as total" | uplt add "total * 0.1 as tax"
+
+# Add multiple columns in one command (more efficient)
+cat sales.csv | uplt add "price * quantity as total, total * 0.1 as tax"
 ```
 
 #### Conditional columns
@@ -238,8 +250,14 @@ cat sales.csv | uplt groupby region "sum(sales),avg(price)"
 # Group by multiple fields
 cat sales.csv | uplt groupby "category,region" "sum(sales),count(*)"
 
+# Functions with commas are properly parsed
+cat data.csv | uplt groupby "IIF(price > 100, 'expensive', 'cheap') as tier, category" "sum(sales)"
+
 # Using SQLite aggregate functions
 cat data.csv | uplt groupby category "min(price),max(price),avg(price)"
+
+# Complex expressions in both grouping and aggregation
+cat data.csv | uplt groupby "substr(model_filename, 10) as model, IIF(n_gpu_layers > 0, 'gpu', 'cpu') as device" "avg(latency)"
 ```
 
 #### Aggregate-all shortcuts

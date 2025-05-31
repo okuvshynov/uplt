@@ -1,7 +1,7 @@
 import sys
 import sqlite3
 import argparse
-from .core import create_table_from_csv, execute_query, format_output, parse_field_with_alias
+from .core import create_table_from_csv, execute_query, format_output, parse_field_with_alias, split_expressions
 from .query_builder import parse_chart_command
 
 
@@ -143,18 +143,20 @@ def main():
             
             # Output results as CSV with headers
             if results:
-                # Extract the new column name from the expression
-                # Look for "as column_name" pattern
-                import re
-                as_match = re.search(r'\s+as\s+(\w+)\s*$', column_expr, re.IGNORECASE)
-                if as_match:
-                    new_column_name = as_match.group(1)
-                else:
-                    # Default name if no alias provided
-                    new_column_name = f"expr_{len(original_columns)+1}"
+                # Parse multiple column expressions (comma-separated, respecting parentheses)
+                raw_expressions = split_expressions(column_expr)
+                new_column_names = []
+                
+                for i, expr in enumerate(raw_expressions):
+                    expr_parsed, alias = parse_field_with_alias(expr)
+                    if alias:
+                        new_column_names.append(alias)
+                    else:
+                        # Default name if no alias provided
+                        new_column_names.append(f"expr_{len(original_columns)+i+1}")
                 
                 # Output headers
-                all_headers = original_columns + [new_column_name]
+                all_headers = original_columns + new_column_names
                 print(','.join(all_headers))
                 
                 # Output data
@@ -217,8 +219,8 @@ def main():
                 print("Error: Group by fields required after 'groupby'", file=sys.stderr)
                 sys.exit(1)
             
-            # Parse group by fields (comma-separated)
-            raw_groupby_fields = [f.strip() for f in args.command[1].split(',')]
+            # Parse group by fields (comma-separated, respecting parentheses)
+            raw_groupby_fields = split_expressions(args.command[1])
             
             # Parse each field for potential aliases
             groupby_fields = []
@@ -267,7 +269,7 @@ def main():
                     agg_expressions = [f"{agg_func}({col}) as {col}_{agg_func}" for col in numeric_columns]
                 else:
                     # Full syntax: parse comma-separated aggregation expressions
-                    raw_agg_expressions = [expr.strip() for expr in agg_spec.split(',')]
+                    raw_agg_expressions = split_expressions(agg_spec)
                     # Parse each aggregation expression for potential aliases
                     agg_expressions = []
                     for agg_expr in raw_agg_expressions:

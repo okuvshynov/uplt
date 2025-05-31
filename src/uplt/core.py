@@ -5,6 +5,52 @@ import re
 from typing import List, Any, Optional, Tuple
 
 
+def split_expressions(expr_string: str) -> List[str]:
+    """Split comma-separated expressions while respecting parentheses.
+    
+    Examples:
+        "a, b" -> ["a", "b"]
+        "IIF(a > 0, 'yes', 'no'), b" -> ["IIF(a > 0, 'yes', 'no')", "b"]
+        "substr(name, 1, 5) as prefix, upper(type) as TYPE" -> ["substr(name, 1, 5) as prefix", "upper(type) as TYPE"]
+    """
+    expressions = []
+    current_expr = ""
+    paren_depth = 0
+    quote_char = None
+    
+    i = 0
+    while i < len(expr_string):
+        char = expr_string[i]
+        
+        # Handle quotes
+        if char in ('"', "'") and quote_char is None:
+            quote_char = char
+        elif char == quote_char:
+            quote_char = None
+        
+        # Only count parentheses when not inside quotes
+        if quote_char is None:
+            if char == '(':
+                paren_depth += 1
+            elif char == ')':
+                paren_depth -= 1
+            elif char == ',' and paren_depth == 0:
+                # This is a top-level comma, split here
+                expressions.append(current_expr.strip())
+                current_expr = ""
+                i += 1
+                continue
+        
+        current_expr += char
+        i += 1
+    
+    # Add the last expression
+    if current_expr.strip():
+        expressions.append(current_expr.strip())
+    
+    return expressions
+
+
 def parse_field_with_alias(field_expr: str) -> Tuple[str, Optional[str]]:
     """Parse a field expression that may contain an AS alias.
     
